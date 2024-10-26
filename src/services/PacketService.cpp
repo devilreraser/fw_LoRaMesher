@@ -15,6 +15,17 @@ Packet<uint8_t>* PacketService::createEmptyPacket(size_t packetSize) {
 
 }
 
+RTRequestPacket* PacketService::createRoutingTableRequestPacket(uint16_t dst, uint16_t src) {
+    RTRequestPacket* rtRequestPacket = PacketFactory::createPacket<RTRequestPacket>(0, 0);
+    if (rtRequestPacket) {
+      rtRequestPacket->dst = dst;
+      rtRequestPacket->src = src;
+      rtRequestPacket->type = ROUTING_REQUEST_P;
+      rtRequestPacket->packetSize = sizeof(RTRequestPacket);
+    }
+    return rtRequestPacket;
+}
+
 AppPacket<uint8_t>* PacketService::convertPacket(DataPacket* p) {
     uint32_t payloadSize = p->packetSize - sizeof(DataPacket);
 
@@ -52,11 +63,19 @@ bool PacketService::isOnlyDataPacket(uint8_t type) {
 }
 
 bool PacketService::isControlPacket(uint8_t type) {
-    return !(isHelloPacket(type) || isOnlyDataPacket(type));
+    return !(isRoutingTablePacket(type) || isOnlyDataPacket(type) || isHelloPacket(type) || isRoutingTableRequestPacket(type));
+}
+
+bool PacketService::isRoutingTablePacket(uint8_t type) {
+    return type == ROUTING_P;
+}
+
+bool PacketService::isRoutingTableRequestPacket(uint8_t type) {
+    return type == ROUTING_REQUEST_P;
 }
 
 bool PacketService::isHelloPacket(uint8_t type) {
-    return (type & HELLO_P) == HELLO_P;
+    return type == HELLO_P;
 }
 
 bool PacketService::isNeedAckPacket(uint8_t type) {
@@ -64,23 +83,24 @@ bool PacketService::isNeedAckPacket(uint8_t type) {
 }
 
 bool PacketService::isAckPacket(uint8_t type) {
-    return (type & ACK_P) == ACK_P;
+    return type == ACK_P;
 }
 
 bool PacketService::isLostPacket(uint8_t type) {
-    return (type & LOST_P) == LOST_P;
+    return type == LOST_P;
 }
 
 bool PacketService::isSyncPacket(uint8_t type) {
-    return (type & SYNC_P) == SYNC_P;
+    return type == SYNC_P;
 }
 
 bool PacketService::isXLPacket(uint8_t type) {
-    return (type & XL_DATA_P) == XL_DATA_P;
+    return type == XL_DATA_P;
 }
 
 bool PacketService::isDataControlPacket(uint8_t type) {
-    return (isHelloPacket(type) || isAckPacket(type) || isLostPacket(type) || isLostPacket(type));
+    return (isRoutingTablePacket(type) || isAckPacket(type) || isLostPacket(type) ||
+        isLostPacket(type) || isHelloPacket(type) || isSyncPacket(type) || isRoutingTableRequestPacket(type));
 }
 
 uint8_t PacketService::getHeaderLength(uint8_t type) {
@@ -93,17 +113,35 @@ uint8_t PacketService::getHeaderLength(uint8_t type) {
     return 0;
 }
 
-RoutePacket* PacketService::createRoutingPacket(uint16_t localAddress, NetworkNode* nodes, size_t numOfNodes, uint8_t nodeRole) {
+RoutePacket* PacketService::createRoutingPacket(uint16_t localAddress, NetworkNode* nodes, size_t numOfNodes, uint8_t nodeRole, uint8_t rtId) {
     size_t routingSizeInBytes = numOfNodes * sizeof(NetworkNode);
 
     RoutePacket* routePacket = PacketFactory::createPacket<RoutePacket>(reinterpret_cast<uint8_t*>(nodes), routingSizeInBytes);
-    routePacket->dst = BROADCAST_ADDR;
-    routePacket->src = localAddress;
-    routePacket->type = HELLO_P;
-    routePacket->packetSize = routingSizeInBytes + sizeof(RoutePacket);
-    routePacket->nodeRole = nodeRole;
-
+    if (routePacket) {
+      routePacket->dst = BROADCAST_ADDR;
+      routePacket->src = localAddress;
+      routePacket->type = ROUTING_P;
+      routePacket->packetSize = routingSizeInBytes + sizeof(RoutePacket);
+      routePacket->nodeRole = nodeRole;
+      routePacket->routingTableId = rtId;
+    }
     return routePacket;
+}
+
+HelloPacket* PacketService::createHelloPacket(uint16_t localAddress, HelloPacketNode* nodes, size_t numOfNodes,
+    uint8_t routingTableId, uint8_t routingTableSize) {
+    size_t helloSizeInBytes = numOfNodes * sizeof(HelloPacketNode);
+
+    HelloPacket* helloPacket = PacketFactory::createPacket<HelloPacket>(reinterpret_cast<uint8_t*>(nodes), helloSizeInBytes);
+    if (helloPacket) {
+      helloPacket->dst = BROADCAST_ADDR;
+      helloPacket->src = localAddress;
+      helloPacket->type = HELLO_P;
+      helloPacket->packetSize = helloSizeInBytes + sizeof(HelloPacket);
+      helloPacket->routingTableId = routingTableId;
+      helloPacket->routingTableSize = routingTableSize;
+    }      
+    return helloPacket;
 }
 
 DataPacket* PacketService::dataPacket(Packet<uint8_t>* p) {
@@ -116,33 +154,36 @@ ControlPacket* PacketService::controlPacket(Packet<uint8_t>* p) {
 
 ControlPacket* PacketService::createControlPacket(uint16_t dst, uint16_t src, uint8_t type, uint8_t* payload, uint8_t payloadSize) {
     ControlPacket* packet = PacketFactory::createPacket<ControlPacket>(payload, payloadSize);
-    packet->dst = dst;
-    packet->src = src;
-    packet->type = type;
-    packet->packetSize = payloadSize + sizeof(ControlPacket);
-
+    if (packet) {
+      packet->dst = dst;
+      packet->src = src;
+      packet->type = type;
+      packet->packetSize = payloadSize + sizeof(ControlPacket);
+    }
     return packet;
 }
 
 ControlPacket* PacketService::createEmptyControlPacket(uint16_t dst, uint16_t src, uint8_t type, uint8_t seq_id, uint16_t num_packets) {
     ControlPacket* packet = PacketFactory::createPacket<ControlPacket>(0, 0);
-    packet->dst = dst;
-    packet->src = src;
-    packet->type = type;
-    packet->seq_id = seq_id;
-    packet->number = num_packets;
-    packet->packetSize = sizeof(ControlPacket);
-
+    if (packet) {
+      packet->dst = dst;
+      packet->src = src;
+      packet->type = type;
+      packet->seq_id = seq_id;
+      packet->number = num_packets;
+      packet->packetSize = sizeof(ControlPacket);
+    }
     return packet;
 }
 
 DataPacket* PacketService::createDataPacket(uint16_t dst, uint16_t src, uint8_t type, uint8_t* payload, uint8_t payloadSize) {
     DataPacket* packet = PacketFactory::createPacket<DataPacket>(payload, payloadSize);
-    packet->dst = dst;
-    packet->src = src;
-    packet->type = type;
-    packet->packetSize = payloadSize + sizeof(DataPacket);
-
+    if (packet) {
+      packet->dst = dst;
+      packet->src = src;
+      packet->type = type;
+      packet->packetSize = payloadSize + sizeof(DataPacket);
+    }
     return packet;
 }
 
