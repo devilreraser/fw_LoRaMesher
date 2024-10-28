@@ -1,10 +1,19 @@
 #include <Arduino.h>
 #include "LoraMesher.h"
 
+#define USE_CS_1274     1
+
+#if USE_CS_1274 
+//Using CS-1274 GW ESP32 
+#define BOARD_LED   4       /* I2C_SCL */
+#define LED_ON      LOW
+#define LED_OFF     HIGH
+#else   /* #if USE_CS_1274 */
 //Using LILYGO TTGO T-BEAM v1.1 
 #define BOARD_LED   4
 #define LED_ON      LOW
 #define LED_OFF     HIGH
+#endif  /* #if USE_CS_1274 */
 
 LoraMesher& radio = LoraMesher::getInstance();
 
@@ -108,11 +117,26 @@ void setupLoraMesher() {
     //Get the configuration of the LoRaMesher
     LoraMesher::LoraMesherConfig config = LoraMesher::LoraMesherConfig();
 
+    #if USE_CS_1274
+    //Set the configuration of the LoRaMesher (CS-1274 GW ESP32)
+    config.loraCs = 5;      /* ESP32_VSPI_CS */
+    config.loraRst = 2;    /* 2 - CAN_TX */
+    config.loraIrq = 34;   /* LoRA_G0 */    
+    config.loraIo1 = -1;   /* LoRA_G1 */
+
+    config.loraMISO = 36;   /* ESP32_VSPI_MISO */
+    config.loraMOSI = 33;   /* ESP32_VSPI_MOSI */
+    config.loraSCK = 13;    /* ESP32_VSPI_SCLK */
+    #else   /* #if USE_CS_1274 */
     //Set the configuration of the LoRaMesher (TTGO T-BEAM v1.1)
     config.loraCs = 18;
     config.loraRst = 23;
     config.loraIrq = 26;
     config.loraIo1 = 33;
+    config.loraMISO = -1;  
+    config.loraMOSI = -1;  
+    config.loraSCK = -1;   
+    #endif  /* #if USE_CS_1274 */
 
     config.module = LoraMesher::LoraModules::SX1276_MOD;
 
@@ -151,7 +175,7 @@ void loop() {
         //Create packet and send it.
         radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
 
-        //Wait 20 seconds to send the next packet
-        vTaskDelay(20000 / portTICK_PERIOD_MS);
+        //Wait 2 seconds to send the next packet
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
