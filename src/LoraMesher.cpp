@@ -7,6 +7,7 @@
 
 LoraMesher::LoraMesher() {}
 
+
 void LoraMesher::begin(LoraMesherConfig config) {
     ESP_LOGV(LM_TAG, "Initializing LoraMesher v%s", LM_VERSION);
 
@@ -132,7 +133,8 @@ void LoraMesher::initializeLoRa() {
 
 #ifdef ARDUINO
     if (config.spi == nullptr) {
-        SPI.begin();
+        //SPI.begin();
+        SPI.begin(config.loraSCK, config.loraMISO, config.loraMOSI);
         config.spi = &SPI;
     }
 
