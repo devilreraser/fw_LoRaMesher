@@ -41,7 +41,7 @@ void led_Flash(uint16_t flashes, uint16_t delaymS) {
  * @param data
  */
 void printPacket(dataPacket data) {
-    Serial.printf("Hello Counter received nº %d\n", data.counter);
+    Serial.printf("Hello Counter received nº %d\r\n", data.counter);
 }
 
 /**
@@ -50,7 +50,7 @@ void printPacket(dataPacket data) {
  * @param packet
  */
 void printDataPacket(AppPacket<dataPacket>* packet) {
-    Serial.printf("Packet arrived from %X with size %d\n", packet->src, packet->payloadSize);
+    Serial.printf("Packet arrived from %X with size %d\r\n", packet->src, packet->payloadSize);
 
     //Get the payload to iterate through it
     dataPacket* dPacket = packet->payload;
@@ -75,7 +75,7 @@ void processReceivedPackets(void*) {
         //Iterate through all the packets inside the Received User Packets Queue
         while (radio.getReceivedQueueSize() > 0) {
             Serial.println("ReceivedUserData_TaskHandle notify received");
-            Serial.printf("Queue receiveUserData size: %d\n", radio.getReceivedQueueSize());
+            Serial.printf("Queue receiveUserData size: %d\r\n", radio.getReceivedQueueSize());
 
             //Get the first element inside the Received User Packets Queue
             AppPacket<dataPacket>* packet = radio.getNextAppPacket<dataPacket>();
@@ -104,7 +104,7 @@ void createReceiveMessages() {
         2,
         &receiveLoRaMessage_Handle);
     if (res != pdPASS) {
-        Serial.printf("Error: Receive App Task creation gave error: %d\n", res);
+        Serial.printf("Error: Receive App Task creation gave error: %d\r\n", res);
     }
 }
 
@@ -120,9 +120,9 @@ void setupLoraMesher() {
     #if USE_CS_1274
     //Set the configuration of the LoRaMesher (CS-1274 GW ESP32)
     config.loraCs = 5;      /* ESP32_VSPI_CS */
-    config.loraRst = 2;    /* 2 - CAN_TX */
+    config.loraRst = 2;     /* 2 - CAN_TX */
     config.loraIrq = 34;   /* LoRA_G0 */    
-    config.loraIo1 = -1;   /* LoRA_G1 */
+    config.loraIo1 = 23;   /* LoRA_G1 */
 
     config.loraMISO = 36;   /* ESP32_VSPI_MISO */
     config.loraMOSI = 33;   /* ESP32_VSPI_MOSI */
@@ -133,10 +133,11 @@ void setupLoraMesher() {
     config.loraRst = 23;
     config.loraIrq = 26;
     config.loraIo1 = 33;
-    config.loraMISO = -1;  
-    config.loraMOSI = -1;  
-    config.loraSCK = -1;   
+    config.loraMISO = 12;  
+    config.loraMOSI = 13;  
+    config.loraSCK = 14;   
     #endif  /* #if USE_CS_1274 */
+
 
     config.module = LoraMesher::LoraModules::SX1276_MOD;
 
@@ -168,14 +169,14 @@ void setup() {
 
 void loop() {
     for (;;) {
-        Serial.printf("Send packet %d\n", dataCounter);
+        Serial.printf("Send packet %d\r\n", dataCounter);
 
         helloPacket->counter = dataCounter++;
 
         //Create packet and send it.
         radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
 
-        //Wait 2 seconds to send the next packet
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        //Wait 5 seconds to send the next packet
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
