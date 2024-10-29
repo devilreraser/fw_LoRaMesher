@@ -44,6 +44,16 @@ uint16_t rgb_mask[] =
     0b001,
     0b110,
 };
+
+uint16_t messages[] = 
+{
+    0,
+    0,
+    0,
+    0,
+};
+
+
                             //rgb
 uint16_t rgb_mask_unknown = 0b101;
 
@@ -126,6 +136,10 @@ void processReceivedPackets(void*) {
                     {
                         rgb_code = rgb_mask[i];
                     }
+                    if (i < sizeof(messages)/sizeof(messages[0]))
+                    {
+                        messages[i]++;
+                    }
                     break;
                 }
             }
@@ -139,6 +153,12 @@ void processReceivedPackets(void*) {
             //Delete the packet when used. It is very important to call this function to release the memory of the packet.
             radio.deletePacket(packet);
         }
+        uint16_t id_spare = 0;
+        uint16_t messages_spare = 0;
+        Serial.printf("----------------------------------------------\r\n");
+        Serial.printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
+        Serial.printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
+        Serial.printf("----------------------------------------------\r\n");
     }
 }
 
