@@ -65,6 +65,7 @@ LoraMesher& radio = LoraMesher::getInstance();
 uint32_t dataCounter = 0;
 struct dataPacket {
     uint32_t counter = 0;
+    uint32_t id_sender = 0;
 };
 
 dataPacket* helloPacket = new dataPacket;
@@ -78,6 +79,57 @@ void led_Flash(uint16_t flashes, uint16_t delaymS) {
         digitalWrite(BOARD_LED, LED_OFF);
         delay(delaymS);
     }
+}
+
+void printRouteNode(RouteNode* routeNode) {
+    Serial.print("Destination: ");
+    Serial.print(routeNode->networkNode.address, HEX);  // Destination node address in hexadecimal
+
+    Serial.print(" | Metric: ");
+    Serial.print(routeNode->networkNode.metric);  // Metric associated with this route
+
+    Serial.print(" | Next Hop (via): ");
+    Serial.print(routeNode->via, HEX);  // Next hop address in hexadecimal
+
+    Serial.print(" | Hop Count: ");
+    Serial.print(routeNode->networkNode.hop_count);  // Number of hops to the destination
+
+    Serial.print(" | Received SNR: ");
+    Serial.print(routeNode->receivedSNR);  // Signal-to-noise ratio for received packets
+
+    Serial.print(" | Sent SNR: ");
+    Serial.print(routeNode->sentSNR);  // Signal-to-noise ratio for sent packets
+
+    Serial.print(" | Received Link Quality: ");
+    Serial.print(routeNode->received_link_quality);  // Link quality for received packets
+
+    Serial.print(" | Transmitted Link Quality: ");
+    Serial.print(routeNode->transmitted_link_quality);  // Link quality for transmitted packets
+
+    Serial.print(" | SRTT: ");
+    Serial.print(routeNode->SRTT);  // Smoothed round-trip time
+
+    Serial.print(" | RTTVAR: ");
+    Serial.print(routeNode->RTTVAR);  // Round-trip time variation
+
+    Serial.print(" | Received Metric: ");
+    Serial.println(routeNode->receivedMetric);  // Received metric for this route
+}
+
+void printRoutingTable() {
+    // Get a copy of the routing table
+    LM_LinkedList<RouteNode>* routingTable = radio.routingTableListCopy();
+
+    if (routingTable->getLength() > 0) {
+        Serial.println("Routing Table:");
+        routingTable->each(printRouteNode);  // Apply the print function to each route node
+    } else {
+        Serial.println("Routing Table is empty.");
+    }
+
+    // Delete the copied routing table to prevent memory leaks
+    delete routingTable;
+    Serial.println();  // Add a blank line for readability
 }
 
 /**
@@ -106,7 +158,14 @@ void printDataPacket(AppPacket<dataPacket>* packet) {
         printPacket(dPacket[i]);
     }
 }
-
+void printMessageCounts() {
+    uint16_t id_spare = 0;
+    uint16_t messages_spare = 0;
+    Serial.printf("----------------------------------------------\r\n");
+    Serial.printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
+    Serial.printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
+    Serial.printf("----------------------------------------------\r\n");
+}
 /**
  * @brief Function that process the received packets
  *
@@ -126,39 +185,56 @@ void processReceivedPackets(void*) {
 
             //Print the data packet
             printDataPacket(packet);
-            
-            uint16_t rgb_code = rgb_mask_unknown;
-            for (int i = 0; i < sizeof(id_list)/sizeof(id_list[0]); i++)
+
+            uint16_t packet_size = packet->payloadSize;
+            uint16_t packet_sender = 0;
+            dataPacket* helloPacketReceived = packet->payload;
+            if (packet_size < sizeof(dataPacket))
             {
-                if (packet->src == id_list[i])
+                Serial.printf("Error Received packet_size %d < sizeof(dataPacket) %d \r\n", packet_size, sizeof(dataPacket));
+            }
+            else
+            {
+                packet_sender = helloPacketReceived->id_sender;
+                Serial.printf("Received Data from sender. %X\r\n", packet_sender);
+                
+                uint16_t rgb_code = rgb_mask_unknown;
+                for (int i = 0; i < sizeof(id_list)/sizeof(id_list[0]); i++)
                 {
-                    if (i < sizeof(rgb_mask)/sizeof(rgb_mask[0]))
+                    if (packet_sender == id_list[i])
                     {
-                        rgb_code = rgb_mask[i];
+                        if (i < sizeof(rgb_mask)/sizeof(rgb_mask[0]))
+                        {
+                            rgb_code = rgb_mask[i];
+                        }
+                        if (i < sizeof(messages)/sizeof(messages[0]))
+                        {
+                            messages[i]++;
+                        }
+                        break;
                     }
-                    if (i < sizeof(messages)/sizeof(messages[0]))
-                    {
-                        messages[i]++;
-                    }
-                    break;
+                }
+                
+                if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
+                    Serial.printf("Data sent to queue. %X\r\n", rgb_code);
+                } else {
+                    Serial.println("Failed to send data to queue.");
                 }
             }
-            
-            if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
-                Serial.printf("Data sent to queue. %X\r\n", rgb_code);
-            } else {
-                Serial.println("Failed to send data to queue.");
-            }
+
+            // // Check if the packet is a broadcast message
+            // if (packet->dst == BROADCAST_ADDR) {
+            //     // Retransmit the broadcast message
+            //     Serial.println("Retransmitting broadcast message...");
+            //     radio.createPacketAndSend(BROADCAST_ADDR, packet->payload, packet->getPayloadLength());
+            // }
+
 
             //Delete the packet when used. It is very important to call this function to release the memory of the packet.
             radio.deletePacket(packet);
         }
-        uint16_t id_spare = 0;
-        uint16_t messages_spare = 0;
-        Serial.printf("----------------------------------------------\r\n");
-        Serial.printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
-        Serial.printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
-        Serial.printf("----------------------------------------------\r\n");
+        // Print message counts for each ID
+        printMessageCounts();
     }
 }
 
@@ -303,6 +379,7 @@ void setupLoraMesher() {
     //Set the task handle to the LoRaMesher
     radio.setReceiveAppDataTaskHandle(receiveLoRaMessage_Handle);
 
+
     #if USE_SBC_NodeMCU_ESP32
     // digitalWrite(LORA_ENABLE, ENABLE_OFF);
     // vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -362,8 +439,9 @@ void setup() {
         Serial.println("Failed to send data to queue.");
     }
 
-
+    helloPacket->id_sender = radio.getLocalAddress();
 }
+
 
 
 void loop() {
@@ -374,6 +452,26 @@ void loop() {
 
         //Create packet and send it.
         radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
+        Serial.printf("Data sent to queue from this sender: %X\r\n", helloPacket->id_sender);
+
+        printRoutingTable();
+
+        Serial.printf("routingTableSize                 %d\r\n", radio.routingTableSize());
+        Serial.printf("getLocalAddress                  %X\r\n", radio.getLocalAddress());
+        Serial.printf("getReceivedDataPacketsNum        %d\r\n", radio.getReceivedDataPacketsNum());
+        Serial.printf("getSendPacketsNum                %d\r\n", radio.getSendPacketsNum());
+        Serial.printf("getReceivedHelloPacketsNum       %d\r\n", radio.getReceivedHelloPacketsNum());
+        Serial.printf("getSentHelloPacketsNum           %d\r\n", radio.getSentHelloPacketsNum());
+        Serial.printf("getReceivedBroadcastPacketsNum   %d\r\n", radio.getReceivedBroadcastPacketsNum());
+        Serial.printf("getForwardedPacketsNum           %d\r\n", radio.getForwardedPacketsNum());
+        Serial.printf("getDataPacketsForMeNum           %d\r\n", radio.getDataPacketsForMeNum());
+        Serial.printf("getReceivedIAmViaNum             %d\r\n", radio.getReceivedIAmViaNum());
+        Serial.printf("getDestinyUnreachableNum         %d\r\n", radio.getDestinyUnreachableNum());
+        Serial.printf("getReceivedNotForMe              %d\r\n", radio.getReceivedNotForMe());
+        Serial.printf("getReceivedPayloadBytes          %d\r\n", radio.getReceivedPayloadBytes());
+        Serial.printf("getReceivedControlBytes          %d\r\n", radio.getReceivedControlBytes());
+        Serial.printf("getSentPayloadBytes              %d\r\n", radio.getSentPayloadBytes());
+        Serial.printf("getSentControlBytes              %d\r\n", radio.getSentControlBytes());
 
         //Wait 5 seconds to send the next packet
         vTaskDelay(5000 / portTICK_PERIOD_MS);
