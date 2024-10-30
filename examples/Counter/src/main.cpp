@@ -1,6 +1,10 @@
 #include <Arduino.h>
 #include "LoraMesher.h"
 
+#include <vector>
+
+
+
 //priority higher to lower
 #define USE_SBC_NodeMCU_ESP32       1
 #define USE_CS_1274                 1
@@ -69,6 +73,11 @@ struct dataPacket {
 };
 
 dataPacket* helloPacket = new dataPacket;
+
+
+// Limit the vector to store a maximum of 16 unique broadcast payloads
+std::vector<dataPacket> previousBroadcastPayloads;
+const size_t maxBroadcastPayloads = 16;
 
 //Led flash
 void led_Flash(uint16_t flashes, uint16_t delaymS) {
@@ -186,48 +195,84 @@ void processReceivedPackets(void*) {
             //Print the data packet
             printDataPacket(packet);
 
-            uint16_t packet_size = packet->payloadSize;
-            uint16_t packet_sender = 0;
-            dataPacket* helloPacketReceived = packet->payload;
-            if (packet_size < sizeof(dataPacket))
-            {
-                Serial.printf("Error Received packet_size %d < sizeof(dataPacket) %d \r\n", packet_size, sizeof(dataPacket));
-            }
-            else
-            {
-                packet_sender = helloPacketReceived->id_sender;
-                Serial.printf("Received Data from sender. %X\r\n", packet_sender);
-                
-                uint16_t rgb_code = rgb_mask_unknown;
-                for (int i = 0; i < sizeof(id_list)/sizeof(id_list[0]); i++)
-                {
-                    if (packet_sender == id_list[i])
-                    {
-                        if (i < sizeof(rgb_mask)/sizeof(rgb_mask[0]))
-                        {
-                            rgb_code = rgb_mask[i];
-                        }
-                        if (i < sizeof(messages)/sizeof(messages[0]))
-                        {
-                            messages[i]++;
-                        }
+            bool isUnique = false;
+
+            // Check if the packet is a broadcast message
+            if (packet->dst == BROADCAST_ADDR) {
+                // Flag to track if the payload is unique
+                isUnique = true;
+
+                dataPacket* helloPacketReceived = packet->payload;
+
+                // Compare with previous broadcast payloads
+                for (const auto& previousPayload : previousBroadcastPayloads) {
+                    if (memcmp(helloPacketReceived, &previousPayload, sizeof(dataPacket)) == 0) {
+                        isUnique = false;
+                        Serial.println("Duplicate broadcast message detected, skipping retransmission.");
                         break;
                     }
                 }
-                
-                if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
-                    Serial.printf("Data sent to queue. %X\r\n", rgb_code);
-                } else {
-                    Serial.println("Failed to send data to queue.");
+
+                // If unique, retransmit and store in the list
+                if (isUnique) {
+                    Serial.println("Retransmitting unique broadcast message...");
+                    radio.createPacketAndSend(BROADCAST_ADDR, packet->payload, packet->getPayloadLength());
+                    
+                    // Check the size of previousBroadcastPayloads and maintain the limit
+                    if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
+                        previousBroadcastPayloads.erase(previousBroadcastPayloads.begin());  // Remove the oldest entry
+                    }
+                    // Store the new unique payload
+                    previousBroadcastPayloads.push_back(*helloPacketReceived);
+                }
+            }
+            else
+            {
+                isUnique = true;
+            }
+
+
+
+            if (isUnique)
+            {
+                uint16_t packet_size = packet->payloadSize;
+                uint16_t packet_sender = 0;
+                dataPacket* helloPacketReceived = packet->payload;
+
+                if (packet_size < sizeof(dataPacket))
+                {
+                    Serial.printf("Error Received packet_size %d < sizeof(dataPacket) %d \r\n", packet_size, sizeof(dataPacket));
+                }
+                else
+                {
+                    packet_sender = helloPacketReceived->id_sender;
+                    Serial.printf("Received Data from sender. %X\r\n", packet_sender);
+                    
+                    uint16_t rgb_code = rgb_mask_unknown;
+                    for (int i = 0; i < sizeof(id_list)/sizeof(id_list[0]); i++)
+                    {
+                        if (packet_sender == id_list[i])
+                        {
+                            if (i < sizeof(rgb_mask)/sizeof(rgb_mask[0]))
+                            {
+                                rgb_code = rgb_mask[i];
+                            }
+                            if (i < sizeof(messages)/sizeof(messages[0]))
+                            {
+                                messages[i]++;
+                            }
+                            break;
+                        }
+                    }
+                    
+                    if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
+                        Serial.printf("Data sent to queue. %X\r\n", rgb_code);
+                    } else {
+                        Serial.println("Failed to send data to queue.");
+                    }
                 }
             }
 
-            // // Check if the packet is a broadcast message
-            // if (packet->dst == BROADCAST_ADDR) {
-            //     // Retransmit the broadcast message
-            //     Serial.println("Retransmitting broadcast message...");
-            //     radio.createPacketAndSend(BROADCAST_ADDR, packet->payload, packet->getPayloadLength());
-            // }
 
 
             //Delete the packet when used. It is very important to call this function to release the memory of the packet.
@@ -452,6 +497,12 @@ void loop() {
 
         //Create packet and send it.
         radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
+        // Check the size of previousBroadcastPayloads and maintain the limit
+        if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
+            previousBroadcastPayloads.erase(previousBroadcastPayloads.begin());  // Remove the oldest entry
+        }
+        // Store the new unique payload
+        previousBroadcastPayloads.push_back(*helloPacket);
         Serial.printf("Data sent to queue from this sender: %X\r\n", helloPacket->id_sender);
 
         printRoutingTable();
