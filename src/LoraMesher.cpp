@@ -969,7 +969,15 @@ void LoraMesher::processDataPacket(QueuePacket<DataPacket>* pq) {
     else if (packet->dst == BROADCAST_ADDR) {
         ESP_LOGV(LM_TAG, "Data packet from %X BROADCAST", packet->src);
         incReceivedBroadcast();
+        #ifndef LM_RETRANSMIT_BROADCASTS
         processDataPacketForMe(pq);
+        #endif
+        #ifdef LM_RETRANSMIT_BROADCASTS
+        processDataPacketForMeBroadcastRetransmitted(pq);
+        ESP_LOGV(LM_TAG, "Data Packet from %X for %X. Via is me. Forwarding it", packet->src, packet->dst);
+        incReceivedIAmVia();
+        addToSendOrderedAndNotify(reinterpret_cast<QueuePacket<Packet<uint8_t>>*>(pq));
+        #endif
         return;
 
     }
@@ -983,6 +991,20 @@ void LoraMesher::processDataPacket(QueuePacket<DataPacket>* pq) {
     ESP_LOGV(LM_TAG, "Packet not for me, deleting it");
     incReceivedNotForMe();
     PacketQueueService::deleteQueuePacketAndPacket(pq);
+}
+
+void LoraMesher::processDataPacketForMeBroadcastRetransmitted(QueuePacket<DataPacket>* pq) {
+    DataPacket* p = pq->packet;
+    ControlPacket* cPacket = reinterpret_cast<ControlPacket*>(p);
+
+    if (PacketService::isOnlyDataPacket(p->type)) {
+        ESP_LOGV(LM_TAG, "Broadcast Data Packet received");
+        //Convert the packet into a user packet
+        AppPacket<uint8_t>* appPacket = PacketService::convertPacket(p);
+
+        //Add and notify the user of this packet
+        notifyUserReceivedPacket(appPacket);
+    }
 }
 
 void LoraMesher::processDataPacketForMe(QueuePacket<DataPacket>* pq) {

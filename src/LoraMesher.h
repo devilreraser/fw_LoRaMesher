@@ -707,6 +707,7 @@ private:
      * @param pq packet queue to be processed as data packet
      */
     void processDataPacketForMe(QueuePacket<DataPacket>* pq);
+    void processDataPacketForMeBroadcastRetransmitted(QueuePacket<DataPacket>* pq);
 
     /**
      * @brief Notifies the ReceivedUserData_TaskHandle that a packet has been arrived
