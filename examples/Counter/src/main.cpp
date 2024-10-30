@@ -3,7 +3,7 @@
 
 #include <vector>
 
-
+#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
 
 //priority higher to lower
 #define USE_SBC_NodeMCU_ESP32       1
@@ -32,6 +32,8 @@
 #define LED_ON      LOW
 #define LED_OFF     HIGH
 #endif  
+
+uint16_t id_concentrator = BROADCAST_ADDR;
 
 uint16_t id_list[] = 
 {
@@ -247,6 +249,10 @@ void processReceivedPackets(void*) {
                 {
                     packet_sender = helloPacketReceived->id_sender;
                     Serial.printf("Received Data from sender. %X\r\n", packet_sender);
+
+                    if (packet->dst == BROADCAST_ADDR) {
+                        id_concentrator = packet_sender;    //set id_concentrator from broadcast
+                    }
                     
                     uint16_t rgb_code = rgb_mask_unknown;
                     for (int i = 0; i < sizeof(id_list)/sizeof(id_list[0]); i++)
@@ -490,20 +496,40 @@ void setup() {
 
 
 void loop() {
+    bool concentrator = USE_AS_CONCENTRATOR;
     for (;;) {
         Serial.printf("Send packet %d\r\n", dataCounter);
 
-        helloPacket->counter = dataCounter++;
+        if (concentrator)
+        {
+            helloPacket->counter = dataCounter++;
 
-        //Create packet and send it.
-        radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
-        // Check the size of previousBroadcastPayloads and maintain the limit
-        if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
-            previousBroadcastPayloads.erase(previousBroadcastPayloads.begin());  // Remove the oldest entry
+            //Create packet and send it.
+            radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
+            // Check the size of previousBroadcastPayloads and maintain the limit
+            if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
+                previousBroadcastPayloads.erase(previousBroadcastPayloads.begin());  // Remove the oldest entry
+            }
+            // Store the new unique payload
+            previousBroadcastPayloads.push_back(*helloPacket);
+            Serial.printf("Data sent to queue from this sender: %X\r\n", helloPacket->id_sender);
+
         }
-        // Store the new unique payload
-        previousBroadcastPayloads.push_back(*helloPacket);
-        Serial.printf("Data sent to queue from this sender: %X\r\n", helloPacket->id_sender);
+        else
+        {
+            if (id_concentrator != BROADCAST_ADDR)
+            {
+                helloPacket->counter = dataCounter++;
+
+                //Create packet and send it.
+                radio.createPacketAndSend(id_concentrator, helloPacket, 1);
+            }
+            else
+            {
+                Serial.printf("Data sent to queue skipped\r\n");
+            }
+        }
+
 
         printRoutingTable();
 
