@@ -3,7 +3,9 @@
 
 #include <vector>
 
-#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
+#define TAG "main"
+
+#define USE_AS_CONCENTRATOR   1       /* 0:endpoint 1:concentrator */
 
 //priority higher to lower
 #define USE_SBC_NodeMCU_ESP32       1
@@ -63,6 +65,7 @@ uint16_t messages[] =
                             //rgb
 uint16_t rgb_mask_unknown = 0b101;
 
+QueueHandle_t uint16LedQueue = nullptr;
 QueueHandle_t uint16LedRGBQueue = nullptr;
 
 
@@ -149,7 +152,7 @@ void printRoutingTable() {
  * @param data
  */
 void printPacket(dataPacket data) {
-    Serial.printf("Hello Counter received nº %d\r\n", data.counter);
+    Serial.printf("Packet receive from %04X Nº %3d index\r\n", data.id_sender, data.counter);
 }
 
 /**
@@ -158,7 +161,7 @@ void printPacket(dataPacket data) {
  * @param packet
  */
 void printDataPacket(AppPacket<dataPacket>* packet) {
-    Serial.printf("Packet arrived from %X with size %d\r\n", packet->src, packet->payloadSize);
+    Serial.printf("Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
 
     //Get the payload to iterate through it
     dataPacket* dPacket = packet->payload;
@@ -188,8 +191,8 @@ void processReceivedPackets(void*) {
 
         //Iterate through all the packets inside the Received User Packets Queue
         while (radio.getReceivedQueueSize() > 0) {
-            Serial.println("ReceivedUserData_TaskHandle notify received");
-            Serial.printf("Queue receiveUserData size: %d\r\n", radio.getReceivedQueueSize());
+            ESP_LOGV(TAG, "ReceivedUserData_TaskHandle notify received");
+            ESP_LOGV(TAG, "Queue receiveUserData size: %d", radio.getReceivedQueueSize());
 
             //Get the first element inside the Received User Packets Queue
             AppPacket<dataPacket>* packet = radio.getNextAppPacket<dataPacket>();
@@ -199,8 +202,16 @@ void processReceivedPackets(void*) {
 
             bool isUnique = false;
 
-            // Check if the packet is a broadcast message
-            if (packet->dst == BROADCAST_ADDR) {
+            // Check if the packet is a broadcast message when endpoint
+            #if USE_AS_CONCENTRATOR == 0
+            if (packet->dst != BROADCAST_ADDR) 
+            {
+                isUnique = true;
+                //to do remove duplicated if is concentrator and not broadcast because could come from several endpoints re-transmitted
+            }
+            else
+            #endif
+            {
                 // Flag to track if the payload is unique
                 isUnique = true;
 
@@ -210,15 +221,17 @@ void processReceivedPackets(void*) {
                 for (const auto& previousPayload : previousBroadcastPayloads) {
                     if (memcmp(helloPacketReceived, &previousPayload, sizeof(dataPacket)) == 0) {
                         isUnique = false;
-                        Serial.println("Duplicate broadcast message detected, skipping retransmission.");
+                        ESP_LOGI(TAG, "Duplicate broadcast message detected, skipping retransmission.");
                         break;
                     }
                 }
-
-                // If unique, retransmit and store in the list
+                
+                // If unique, retransmit if needed and store in the list
                 if (isUnique) {
-                    Serial.println("Retransmitting unique broadcast message...");
+                    #if USE_AS_CONCENTRATOR == 0
+                    ESP_LOGI(TAG, "Retransmitting unique broadcast message...");
                     radio.createPacketAndSend(BROADCAST_ADDR, packet->payload, packet->getPayloadLength());
+                    #endif
                     
                     // Check the size of previousBroadcastPayloads and maintain the limit
                     if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
@@ -227,10 +240,6 @@ void processReceivedPackets(void*) {
                     // Store the new unique payload
                     previousBroadcastPayloads.push_back(*helloPacketReceived);
                 }
-            }
-            else
-            {
-                isUnique = true;
             }
 
 
@@ -243,12 +252,12 @@ void processReceivedPackets(void*) {
 
                 if (packet_size < sizeof(dataPacket))
                 {
-                    Serial.printf("Error Received packet_size %d < sizeof(dataPacket) %d \r\n", packet_size, sizeof(dataPacket));
+                    ESP_LOGE(TAG, "Error Received packet_size %d < sizeof(dataPacket) %d", packet_size, sizeof(dataPacket));
                 }
                 else
                 {
                     packet_sender = helloPacketReceived->id_sender;
-                    Serial.printf("Received Data from sender. %X\r\n", packet_sender);
+                    ESP_LOGI(TAG, "Received Data from sender. %X", packet_sender);
 
                     if (packet->dst == BROADCAST_ADDR) {
                         id_concentrator = packet_sender;    //set id_concentrator from broadcast
@@ -272,9 +281,9 @@ void processReceivedPackets(void*) {
                     }
                     
                     if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
-                        Serial.printf("Data sent to queue. %X\r\n", rgb_code);
+                        ESP_LOGV(TAG, "Data sent to queue. %X", rgb_code);
                     } else {
-                        Serial.println("Failed to send data to queue.");
+                        ESP_LOGE(TAG, "Failed to send data to queue.");
                     }
                 }
             }
@@ -304,7 +313,7 @@ void createReceiveMessages() {
         2,
         &receiveLoRaMessage_Handle);
     if (res != pdPASS) {
-        Serial.printf("Error: Receive App Task creation gave error: %d\r\n", res);
+        ESP_LOGE(TAG, "Error: Receive App Task creation gave error: %d", res);
     }
 }
 
@@ -317,9 +326,9 @@ void processLedIndcation(void*) {
     for (;;) {
         uint16_t rgb_code =0b000;
         if (xQueueReceive(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(100)) == pdPASS) {
-            Serial.printf("Data received from queue: %X\r\n", rgb_code);
+            ESP_LOGV(TAG, "Data received from Led RGB queue: %X", rgb_code);
 
-            digitalWrite(BOARD_LED, LED_ON);
+            //digitalWrite(BOARD_LED, LED_ON);
             if (rgb_code & 0b100) digitalWrite(RGB_RED, LOW);
             if (rgb_code & 0b010) digitalWrite(RGB_GREEN, LOW);
             if (rgb_code & 0b001) digitalWrite(RGB_BLUE, LOW);
@@ -344,7 +353,7 @@ void processLedIndcation(void*) {
             vTaskDelay(10 / portTICK_PERIOD_MS);
             digitalWrite(RGB_GREEN, HIGH);
             digitalWrite(RGB_BLUE, HIGH);
-            digitalWrite(BOARD_LED, LED_OFF);
+            //digitalWrite(BOARD_LED, LED_OFF);
 
             vTaskDelay(200 / portTICK_PERIOD_MS);
         } else {
@@ -371,7 +380,50 @@ void createLedIndication() {
         2,
         &ledIndcation_Handle);
     if (res != pdPASS) {
-        Serial.printf("Error: Led Indcation Task creation gave error: %d\r\n", res);
+        ESP_LOGE(TAG, "Error: Led Indication Task creation gave error: %d", res);
+    }
+}
+
+/**
+ * @brief Function that process the led Send indication
+ *
+ */
+void processLedSendIndcation(void*) {
+
+    for (;;) {
+        uint16_t code =0b000;
+        if (xQueueReceive(uint16LedQueue, &code, pdMS_TO_TICKS(100)) == pdPASS) {
+            ESP_LOGV(TAG, "Data received from Led Send queue: %X", code);
+
+            digitalWrite(BOARD_LED, LED_ON);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            digitalWrite(BOARD_LED, LED_OFF);
+
+            vTaskDelay(200 / portTICK_PERIOD_MS);
+        } else {
+            //Serial.println("No data received.");
+        }
+
+
+    }
+    
+}
+
+TaskHandle_t ledSendIndcation_Handle = NULL;
+/**
+ * @brief Create a Led Send indication Task
+ *
+ */
+void createLedSendIndication() {
+    int res = xTaskCreate(
+        processLedSendIndcation,
+        "Receive App Task",
+        4096,
+        (void*) 1,
+        2,
+        &ledSendIndcation_Handle);
+    if (res != pdPASS) {
+        Serial.printf("Error: Led Send Indication Task creation gave error: %d\r\n", res);
     }
 }
 
@@ -466,28 +518,50 @@ void setup() {
 
     uint16LedRGBQueue = xQueueCreate(10, sizeof(uint16_t));
     if (uint16LedRGBQueue == nullptr) {
-        Serial.println("Failed to create queue.");
+        ESP_LOGE(TAG, "Failed to create queue RGB.");
     } else {
-        Serial.println("Queue created successfully.");
+        ESP_LOGV(TAG, "Queue RGB created successfully.");
 
         uint16_t rgb_code = 0b111;  //white
         if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
-            Serial.printf("Data sent to queue. %X\r\n", rgb_code);
+            ESP_LOGV(TAG, "Data sent to queue RGB. %X", rgb_code);
         } else {
-            Serial.println("Failed to send data to queue.");
+            ESP_LOGE(TAG, "Failed to send data to queue RGB.");
         }
     }
 
     createLedIndication();
+
+    uint16LedQueue = xQueueCreate(10, sizeof(uint16_t));
+    if (uint16LedQueue == nullptr) {
+        ESP_LOGE(TAG, "Failed to create queue LED.");
+    } else {
+        ESP_LOGV(TAG, "Queue LED created successfully.");
+
+        uint16_t code = 0b1; //on
+        if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
+            ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
+        } else {
+            ESP_LOGE(TAG, "Failed to send data to queue LED.");
+        }
+    }
+    createLedSendIndication();
 
 
     setupLoraMesher();
 
     uint16_t rgb_code = 0b111;  //white
     if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
-        Serial.printf("Data sent to queue. %X\r\n", rgb_code);
+        ESP_LOGV(TAG, "Data sent to queue RGB. %X", rgb_code);
     } else {
-        Serial.println("Failed to send data to queue.");
+        ESP_LOGE(TAG, "Failed to send data to queue RGB.");
+    }
+
+    uint16_t code = 0b1;  //on
+    if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
+        ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
+    } else {
+        ESP_LOGE(TAG, "Failed to send data to queue LED.");
     }
 
     helloPacket->id_sender = radio.getLocalAddress();
@@ -497,60 +571,82 @@ void setup() {
 
 void loop() {
     bool concentrator = USE_AS_CONCENTRATOR;
+    Serial.printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
+    Serial.printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
     for (;;) {
-        Serial.printf("Send packet %d\r\n", dataCounter);
 
         if (concentrator)
         {
+            ESP_LOGV(TAG, "Send packet %d\r\n", dataCounter);
+
             helloPacket->counter = dataCounter++;
 
             //Create packet and send it.
             radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
+            uint16_t code = 0b1;  //on
+            if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
+                ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
+            } else {
+                ESP_LOGE(TAG, "Failed to send data to queue LED.");
+            }
             // Check the size of previousBroadcastPayloads and maintain the limit
             if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
                 previousBroadcastPayloads.erase(previousBroadcastPayloads.begin());  // Remove the oldest entry
             }
             // Store the new unique payload
             previousBroadcastPayloads.push_back(*helloPacket);
-            Serial.printf("Data sent to queue from this sender: %X\r\n", helloPacket->id_sender);
+            ESP_LOGV(TAG, "Data sent to queue from this sender: %X", helloPacket->id_sender);
 
         }
         else
         {
             if (id_concentrator != BROADCAST_ADDR)
             {
+                ESP_LOGV(TAG, "Send packet %d\r\n", dataCounter);
+
                 helloPacket->counter = dataCounter++;
 
                 //Create packet and send it.
                 radio.createPacketAndSend(id_concentrator, helloPacket, 1);
+                uint16_t code = 0b1;  //on
+                if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
+                    ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
+                } else {
+                    ESP_LOGE(TAG, "Failed to send data to queue LED.");
+                }
             }
             else
             {
-                Serial.printf("Data sent to queue skipped\r\n");
+                ESP_LOGV(TAG, "Data sent to queue skipped");
             }
         }
 
 
         printRoutingTable();
 
-        Serial.printf("routingTableSize                 %d\r\n", radio.routingTableSize());
-        Serial.printf("getLocalAddress                  %X\r\n", radio.getLocalAddress());
-        Serial.printf("getReceivedDataPacketsNum        %d\r\n", radio.getReceivedDataPacketsNum());
-        Serial.printf("getSendPacketsNum                %d\r\n", radio.getSendPacketsNum());
-        Serial.printf("getReceivedHelloPacketsNum       %d\r\n", radio.getReceivedHelloPacketsNum());
-        Serial.printf("getSentHelloPacketsNum           %d\r\n", radio.getSentHelloPacketsNum());
-        Serial.printf("getReceivedBroadcastPacketsNum   %d\r\n", radio.getReceivedBroadcastPacketsNum());
-        Serial.printf("getForwardedPacketsNum           %d\r\n", radio.getForwardedPacketsNum());
-        Serial.printf("getDataPacketsForMeNum           %d\r\n", radio.getDataPacketsForMeNum());
-        Serial.printf("getReceivedIAmViaNum             %d\r\n", radio.getReceivedIAmViaNum());
-        Serial.printf("getDestinyUnreachableNum         %d\r\n", radio.getDestinyUnreachableNum());
-        Serial.printf("getReceivedNotForMe              %d\r\n", radio.getReceivedNotForMe());
-        Serial.printf("getReceivedPayloadBytes          %d\r\n", radio.getReceivedPayloadBytes());
-        Serial.printf("getReceivedControlBytes          %d\r\n", radio.getReceivedControlBytes());
-        Serial.printf("getSentPayloadBytes              %d\r\n", radio.getSentPayloadBytes());
-        Serial.printf("getSentControlBytes              %d\r\n", radio.getSentControlBytes());
+        ESP_LOGV(TAG, "routingTableSize                 %d", radio.routingTableSize());
+        ESP_LOGV(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
+        ESP_LOGV(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
+        ESP_LOGV(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
+        ESP_LOGV(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
+        ESP_LOGV(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
+        ESP_LOGV(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
+        ESP_LOGV(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
+        ESP_LOGV(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
+        ESP_LOGV(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+        ESP_LOGV(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
+        ESP_LOGV(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
+        ESP_LOGV(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
+        ESP_LOGV(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
+        ESP_LOGV(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
+        ESP_LOGV(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
 
+        #if USE_AS_CONCENTRATOR
+        //Wait 5 seconds to send the next packet
+        vTaskDelay(20000 / portTICK_PERIOD_MS);
+        #else
         //Wait 5 seconds to send the next packet
         vTaskDelay(5000 / portTICK_PERIOD_MS);
+        #endif
     }
 }
