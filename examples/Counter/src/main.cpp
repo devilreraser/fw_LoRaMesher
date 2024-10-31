@@ -5,7 +5,7 @@
 
 #define TAG "main"
 
-#define USE_AS_CONCENTRATOR   1       /* 0:endpoint 1:concentrator */
+#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
 
 //priority higher to lower
 #define USE_SBC_NodeMCU_ESP32       1
