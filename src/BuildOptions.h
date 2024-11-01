@@ -1,6 +1,14 @@
 #ifndef _LORAMESHER_BUILD_OPTIONS_H
 #define _LORAMESHER_BUILD_OPTIONS_H
 
+#ifndef ESP32
+#define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\n", tag, ##__VA_ARGS__)
+#define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\n", tag, ##__VA_ARGS__)
+#define ESP_LOGI(tag, format, ...) printf("[INFO] %s: " format "\n", tag, ##__VA_ARGS__)
+#define ESP_LOGW(tag, format, ...) printf("[WARN] %s: " format "\n", tag, ##__VA_ARGS__)
+#define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\n", tag, ##__VA_ARGS__)
+#endif
+
 #ifdef ARDUINO
 #include "Arduino.h"
 #else
