@@ -1,6 +1,12 @@
 #include <Arduino.h>
 #include "LoraMesher.h"
 
+#ifndef ESP32
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#endif
+
 #include <vector>
 
 #define TAG "main"
@@ -499,6 +505,10 @@ void setupLoraMesher() {
 
 void setup() {
     Serial.begin(115200);
+
+    #ifndef ESP32
+    vTaskStartScheduler();
+    #endif
 
     Serial.println("initBoard");
     pinMode(BOARD_LED, OUTPUT); //setup pin as output for indicator LED
