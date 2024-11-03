@@ -1,7 +1,11 @@
 #include "WiFiService.h"
 
 #ifdef ARDUINO
+#ifndef ESP32
+
+#else
 #include "WiFi.h"
+#endif
 #else
 #include "hal/efuse_hal.h"
 #include "esp_mac.h"
@@ -10,7 +14,13 @@
 void WiFiService::init() {
     uint8_t mac[6];
 #ifdef ARDUINO
+#ifndef ESP32
+    long temp_mac = random();
+    mac[4] = temp_mac & 0xFF;
+    mac[5] = temp_mac >> 2 & 0xFF;
+#else
     WiFi.macAddress(mac);
+#endif
 #else
     efuse_hal_get_mac(mac);
 #endif

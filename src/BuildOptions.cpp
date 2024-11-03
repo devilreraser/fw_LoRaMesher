@@ -30,9 +30,15 @@ const char* getPacketType(uint8_t type) {
 
 #ifdef ARDUINO
 
+#ifndef ESP32
+size_t getFreeHeap() {
+    return xPortGetFreeHeapSize();
+}
+#else
 size_t getFreeHeap() {
     return ESP.getFreeHeap();
 }
+#endif
 
 #else 
 
