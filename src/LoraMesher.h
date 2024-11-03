@@ -46,6 +46,7 @@ public:
         SX1278_MOD,
         SX1268_MOD,
         SX1280_MOD,
+        STM32WL_MOD,
     };
 
     /**
@@ -64,7 +65,12 @@ public:
         uint8_t loraSCK = -1; // LoRa SPI SCK pin
 
         // LoRa configuration
+    #ifdef STM32WL
+        // Instantiate STM32WLx 
+        LoraModules module = LoraModules::STM32WL_MOD;
+    #else
         LoraModules module = LoraModules::SX1276_MOD; // Define the module to be used. Allowed values are in the BuildOptions.h file. By default is SX1276_MOD
+    #endif
         float freq = LM_BAND; // Carrier frequency in MHz. Allowed values range from 137.0 MHz to 1020.0 MHz.
         float bw = LM_BANDWIDTH; // LoRa bandwidth in kHz. Allowed values are 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250 and 500 kHz.
         uint8_t sf = LM_LORASF; // LoRa spreading factor. Allowed values range from 6 to 12.
@@ -81,13 +87,18 @@ public:
         // Having different max_packet_size in the same network will cause problems.
         size_t max_packet_size = LM_MAX_PACKET_SIZE;
 #ifdef ARDUINO
+    #ifdef STM32WL
+       STM32WLx_Module* radioModule = nullptr;
+    #else
         // Custom SPI pins
         SPIClass* spi = nullptr;
+    #endif
 #else
         // Custom RadioLibHal
         RadioLibHal* hal = nullptr;
 #endif
-        LoraMesherConfig() {}
+        LoraMesherConfig() {
+        }
     };
 
     /**

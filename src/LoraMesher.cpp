@@ -132,6 +132,19 @@ void LoraMesher::initializeLoRa() {
     ESP_LOGI(LM_TAG, "LoRa IO1: %d", config.loraIo1);
 
 #ifdef ARDUINO
+    #if STM32WL
+    if (config.module == LoraModules::STM32WL_MOD) {
+        if (config.radioModule == nullptr) {
+            // Initialize STM32WLx_Module - this is STM32WL specific and does not require SPI
+            config.radioModule = new STM32WLx_Module();
+        }
+        // Handle STM32WL initialization
+        if (radio == nullptr) {
+            ESP_LOGV(LM_TAG, "Using STM32WL module");
+            radio = new LM_STM32WLx(config.radioModule);  // Pass specific module as needed
+        }
+    } 
+    #else
     if (config.spi == nullptr) {
         //SPI.begin();
         SPI.begin(config.loraSCK, config.loraMISO, config.loraMOSI);
@@ -140,6 +153,10 @@ void LoraMesher::initializeLoRa() {
 
     if (radio == nullptr) {
         switch (config.module) {
+            case LoraModules::STM32WL_MOD:
+                ESP_LOGV(LM_TAG, "Using STM32WL module");
+                radio = new LM_STM32WLx(config.radioModule);
+                break;
             case LoraModules::SX1276_MOD:
                 ESP_LOGV(LM_TAG, "Using SX1276 module");
                 radio = new LM_SX1276(config.loraCs, config.loraIrq, config.loraRst, config.spi);
@@ -166,6 +183,7 @@ void LoraMesher::initializeLoRa() {
                 break;
         }
     }
+    #endif
 
 #else
     if (config.hal == nullptr)
@@ -355,8 +373,16 @@ void LoraMesher::onReceive(void) {
         eSetValueWithoutOverwrite,
         &xHigherPriorityTaskWoken);
 
-    if (xHigherPriorityTaskWoken == pdTRUE)
+    if (xHigherPriorityTaskWoken == pdTRUE) {
+#if defined(ESP32)
         portYIELD_FROM_ISR();
+#elif defined(STM32)
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+#else
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+#endif
+
+    }
 }
 
 void LoraMesher::receivingRoutine() {

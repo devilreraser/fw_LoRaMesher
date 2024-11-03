@@ -16,3 +16,6 @@
 
 // SX1280_MOD
 #include "LM_SX1280.h"
+
+// STM32WL_MOD
+#include "LM_STM32WLx.h"

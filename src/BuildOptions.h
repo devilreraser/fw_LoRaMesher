@@ -8,6 +8,7 @@
 #define ESP_LOGW(tag, format, ...) printf("[WARN] %s: " format "\n", tag, ##__VA_ARGS__)
 #define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\n", tag, ##__VA_ARGS__)
 #include "FreeRTOS.h"
+#include "portmacro.h"
 #include "semphr.h"
 #include "task.h"
 #include "queue.h"
