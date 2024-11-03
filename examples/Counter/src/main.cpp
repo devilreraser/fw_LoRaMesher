@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include "LoraMesher.h"
 
-#ifndef ESP32
+#if defined(ESP32)
+/*  */
+#elif defined(STM32)
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
@@ -474,10 +476,11 @@ void setupLoraMesher() {
     #endif 
 
 
-
-
-    config.module = LoraMesher::LoraModules::SX1276_MOD;
-
+    #ifdef STM32
+    config.module = LoraMesher::LoraModules::STM32WL_MOD; // For STM32 LoRa module
+    #else
+    config.module = LoraMesher::LoraModules::SX1276_MOD; // For ESP32 LoRa module
+    #endif
     //Init the loramesher with a configuration
     radio.begin(config);
 
