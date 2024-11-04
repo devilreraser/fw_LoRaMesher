@@ -104,12 +104,14 @@ dataPacket* helloPacket = new dataPacket;
 std::vector<dataPacket> previousBroadcastPayloads;
 const size_t maxBroadcastPayloads = 16;
 
-#ifndef ESP32
-HardwareSerial Serial1(PB7, PB6); // RX, TX pins
-HardwareSerial& SerialDBG = Serial1; // Create a reference to Serial1
-#else
-HardwareSerial& SerialDBG = Serial; // Create a reference to Serial
-#endif
+
+//below not used used default Serial - left here only for notes how to do this
+// #ifndef ESP32
+// HardwareSerial Serial1(PB7, PB6); // RX, TX pins
+// HardwareSerial& SerialDBG = Serial1; // Create a reference to Serial1
+// #else
+// HardwareSerial& SerialDBG = Serial; // Create a reference to Serial
+// #endif
 
 
 
@@ -133,9 +135,9 @@ void loopTask(void *pvParameters);
 
 #if 0
 extern "C" int _write(int file, char *ptr, int len) {
-    // Loop through the string and send each character to SerialDBG
+    // Loop through the string and send each character to Serial
     for (int i = 0; i < len; i++) {
-        SerialDBG.write(ptr[i]);
+        Serial.write(ptr[i]);
     }
     return len; // Return the number of characters written
 }
@@ -158,7 +160,7 @@ extern "C" int _write(int file, char *ptr, int len) {
 
 // Custom printf function that uses the semaphore for thread-safe access
 void serial_printf(const char *format, ...) {
-    // Wait for semaphore before accessing SerialDBG
+    // Wait for semaphore before accessing Serial
     if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE) {
         char buffer[128];  // Buffer to hold the formatted string
         va_list args;
@@ -166,7 +168,7 @@ void serial_printf(const char *format, ...) {
         vsnprintf(buffer, sizeof(buffer), format, args);
         va_end(args);
 
-        SerialDBG.print(buffer);  // Send the formatted string to SerialDBG
+        Serial.print(buffer);  // Send the formatted string to Serial
 
         // Release the semaphore after printing
         xSemaphoreGive(uartSemaphore);
@@ -213,25 +215,25 @@ void printTask(void *pvParameters) {
 
 void initialize_blink_and_print(void)
 {
-    SerialDBG.begin(115200);
-    while (!SerialDBG);      // Wait for SerialDBG to initialize
-    SerialDBG.println("UART Initialized.");
+    Serial.begin(115200);
+    while (!Serial);      // Wait for Serial to initialize
+    Serial.println("UART Initialized.");
 
     // Create the semaphore for UART access
     uartSemaphore = xSemaphoreCreateMutex();
     if (uartSemaphore == NULL) {
-        SerialDBG.println("Error creating semaphore.");
+        Serial.println("Error creating semaphore.");
         while (1);  // Halt if semaphore creation fails
     }
 
     // Initialize the queue to hold pointers to data buffers
     uartQueue = xQueueCreate(10, sizeof(char*));  // Queue holds up to 10 pointers
     if (uartQueue == NULL) {
-        SerialDBG.println("Error creating queue.");
+        Serial.println("Error creating queue.");
         while (1);  // Halt if queue creation fails
     }
 
-    // Create tasks for LED blinking and SerialDBG data handling
+    // Create tasks for LED blinking and Serial data handling
     xTaskCreate(blinkTask, "Blink Task", 128, NULL, 1, NULL);
     xTaskCreate(printTask, "Print Task", 256, NULL, 1, NULL);
 }
@@ -252,38 +254,38 @@ void led_Flash(uint16_t flashes, uint16_t delaymS) {
 #endif
 
 void printRouteNode(RouteNode* routeNode) {
-    SerialDBG.print("Destination: ");
-    SerialDBG.print(routeNode->networkNode.address, HEX);  // Destination node address in hexadecimal
+    Serial.print("Destination: ");
+    Serial.print(routeNode->networkNode.address, HEX);  // Destination node address in hexadecimal
 
-    SerialDBG.print(" | Metric: ");
-    SerialDBG.print(routeNode->networkNode.metric);  // Metric associated with this route
+    Serial.print(" | Metric: ");
+    Serial.print(routeNode->networkNode.metric);  // Metric associated with this route
 
-    SerialDBG.print(" | Next Hop (via): ");
-    SerialDBG.print(routeNode->via, HEX);  // Next hop address in hexadecimal
+    Serial.print(" | Next Hop (via): ");
+    Serial.print(routeNode->via, HEX);  // Next hop address in hexadecimal
 
-    SerialDBG.print(" | Hop Count: ");
-    SerialDBG.print(routeNode->networkNode.hop_count);  // Number of hops to the destination
+    Serial.print(" | Hop Count: ");
+    Serial.print(routeNode->networkNode.hop_count);  // Number of hops to the destination
 
-    SerialDBG.print(" | Received SNR: ");
-    SerialDBG.print(routeNode->receivedSNR);  // Signal-to-noise ratio for received packets
+    Serial.print(" | Received SNR: ");
+    Serial.print(routeNode->receivedSNR);  // Signal-to-noise ratio for received packets
 
-    SerialDBG.print(" | Sent SNR: ");
-    SerialDBG.print(routeNode->sentSNR);  // Signal-to-noise ratio for sent packets
+    Serial.print(" | Sent SNR: ");
+    Serial.print(routeNode->sentSNR);  // Signal-to-noise ratio for sent packets
 
-    SerialDBG.print(" | Received Link Quality: ");
-    SerialDBG.print(routeNode->received_link_quality);  // Link quality for received packets
+    Serial.print(" | Received Link Quality: ");
+    Serial.print(routeNode->received_link_quality);  // Link quality for received packets
 
-    SerialDBG.print(" | Transmitted Link Quality: ");
-    SerialDBG.print(routeNode->transmitted_link_quality);  // Link quality for transmitted packets
+    Serial.print(" | Transmitted Link Quality: ");
+    Serial.print(routeNode->transmitted_link_quality);  // Link quality for transmitted packets
 
-    SerialDBG.print(" | SRTT: ");
-    SerialDBG.print(routeNode->SRTT);  // Smoothed round-trip time
+    Serial.print(" | SRTT: ");
+    Serial.print(routeNode->SRTT);  // Smoothed round-trip time
 
-    SerialDBG.print(" | RTTVAR: ");
-    SerialDBG.print(routeNode->RTTVAR);  // Round-trip time variation
+    Serial.print(" | RTTVAR: ");
+    Serial.print(routeNode->RTTVAR);  // Round-trip time variation
 
-    SerialDBG.print(" | Received Metric: ");
-    SerialDBG.println(routeNode->receivedMetric);  // Received metric for this route
+    Serial.print(" | Received Metric: ");
+    Serial.println(routeNode->receivedMetric);  // Received metric for this route
 }
 
 void printRoutingTable() {
@@ -291,15 +293,15 @@ void printRoutingTable() {
     LM_LinkedList<RouteNode>* routingTable = radio.routingTableListCopy();
 
     if (routingTable->getLength() > 0) {
-        SerialDBG.println("Routing Table:");
+        Serial.println("Routing Table:");
         routingTable->each(printRouteNode);  // Apply the print function to each route node
     } else {
-        SerialDBG.println("Routing Table is empty.");
+        Serial.println("Routing Table is empty.");
     }
 
     // Delete the copied routing table to prevent memory leaks
     delete routingTable;
-    SerialDBG.println();  // Add a blank line for readability
+    Serial.println();  // Add a blank line for readability
 }
 
 /**
@@ -308,7 +310,7 @@ void printRoutingTable() {
  * @param data
  */
 void printPacket(dataPacket data) {
-    SerialDBG.printf("Packet receive from %04X Nº %3d index\r\n", data.id_sender, data.counter);
+    Serial.printf("Packet receive from %04X Nº %3d index\r\n", data.id_sender, data.counter);
 }
 
 /**
@@ -317,7 +319,7 @@ void printPacket(dataPacket data) {
  * @param packet
  */
 void printDataPacket(AppPacket<dataPacket>* packet) {
-    SerialDBG.printf("Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
+    Serial.printf("Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
 
     //Get the payload to iterate through it
     dataPacket* dPacket = packet->payload;
@@ -331,10 +333,10 @@ void printDataPacket(AppPacket<dataPacket>* packet) {
 void printMessageCounts() {
     uint16_t id_spare = 0;
     uint16_t messages_spare = 0;
-    SerialDBG.printf("----------------------------------------------\r\n");
-    SerialDBG.printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
-    SerialDBG.printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
-    SerialDBG.printf("----------------------------------------------\r\n");
+    Serial.printf("----------------------------------------------\r\n");
+    Serial.printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
+    Serial.printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
+    Serial.printf("----------------------------------------------\r\n");
 }
 /**
  * @brief Function that process the received packets
@@ -515,7 +517,7 @@ void processLedIndcation(void*) {
 
             vTaskDelay(200 / portTICK_PERIOD_MS);
         } else {
-            //SerialDBG.println("No data received.");
+            //Serial.println("No data received.");
         }
 
 
@@ -562,7 +564,7 @@ void processLedSendIndcation(void*) {
 
             vTaskDelay(200 / portTICK_PERIOD_MS);
         } else {
-            //SerialDBG.println("No data received.");
+            //Serial.println("No data received.");
         }
 
 
@@ -584,7 +586,7 @@ void createLedSendIndication() {
         2,
         &ledSendIndcation_Handle);
     if (res != pdPASS) {
-        SerialDBG.printf("Error: Led Send Indication Task creation gave error: %d\r\n", res);
+        Serial.printf("Error: Led Send Indication Task creation gave error: %d\r\n", res);
     }
 }
 #endif
@@ -656,12 +658,12 @@ void setupLoraMesher() {
     //Start LoRaMesher
     radio.start();
 
-    SerialDBG.println("Lora initialized");
+    Serial.println("Lora initialized");
 }
 
 
 void setup() {
-    SerialDBG.begin(115200);
+    Serial.begin(115200);
 
 
     // HAL initialization
@@ -678,7 +680,7 @@ void setup() {
     #endif
 
 
-    SerialDBG.println("initBoard");
+    Serial.println("initBoard");
 
 #ifdef BOARD_LED  
     pinMode(BOARD_LED, OUTPUT); //setup pin as output for indicator LED
@@ -786,8 +788,8 @@ void setup() {
 void loopTask(void *pvParameters) {
     // This replaces the `loop()` function
     bool concentrator = USE_AS_CONCENTRATOR;
-    SerialDBG.printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
-    SerialDBG.printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
+    Serial.printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
+    Serial.printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
     for (;;) {
         if (concentrator)
         {
@@ -869,17 +871,17 @@ void loopTask(void *pvParameters) {
         //delay(5000);
         #endif
 
-        // // Use semaphore to make SerialDBG output thread-safe
+        // // Use semaphore to make Serial output thread-safe
         // if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE) {
-        //     SerialDBG.print("Loop: ");
-        //     SerialDBG.print(millis());  // Print elapsed time in milliseconds
-        //     SerialDBG.println(" ms");
-        //     SerialDBG.print("portTICK_PERIOD_MS: ");
-        //     SerialDBG.println(portTICK_PERIOD_MS);  
-        //     SerialDBG.print("configTICK_RATE_HZ: ");
-        //     SerialDBG.println(configTICK_RATE_HZ);  
-        //     SerialDBG.print("configCPU_CLOCK_HZ: ");
-        //     SerialDBG.println(configCPU_CLOCK_HZ);  
+        //     Serial.print("Loop: ");
+        //     Serial.print(millis());  // Print elapsed time in milliseconds
+        //     Serial.println(" ms");
+        //     Serial.print("portTICK_PERIOD_MS: ");
+        //     Serial.println(portTICK_PERIOD_MS);  
+        //     Serial.print("configTICK_RATE_HZ: ");
+        //     Serial.println(configTICK_RATE_HZ);  
+        //     Serial.print("configCPU_CLOCK_HZ: ");
+        //     Serial.println(configCPU_CLOCK_HZ);  
         //     xSemaphoreGive(uartSemaphore);
         // }
     }
@@ -890,15 +892,15 @@ void loop() {
     for (;;) {
         delay(5000);
         if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE) {
-            SerialDBG.print("Loop: ");
-            SerialDBG.print(millis());  // Print elapsed time in milliseconds
-            SerialDBG.println(" ms");
-            SerialDBG.print("portTICK_PERIOD_MS: ");
-            SerialDBG.println(portTICK_PERIOD_MS);  
-            SerialDBG.print("configTICK_RATE_HZ: ");
-            SerialDBG.println(configTICK_RATE_HZ);  
-            SerialDBG.print("configCPU_CLOCK_HZ: ");
-            SerialDBG.println(configCPU_CLOCK_HZ);  
+            Serial.print("Loop: ");
+            Serial.print(millis());  // Print elapsed time in milliseconds
+            Serial.println(" ms");
+            Serial.print("portTICK_PERIOD_MS: ");
+            Serial.println(portTICK_PERIOD_MS);  
+            Serial.print("configTICK_RATE_HZ: ");
+            Serial.println(configTICK_RATE_HZ);  
+            Serial.print("configCPU_CLOCK_HZ: ");
+            Serial.println(configCPU_CLOCK_HZ);  
             xSemaphoreGive(uartSemaphore);
         }
     }
