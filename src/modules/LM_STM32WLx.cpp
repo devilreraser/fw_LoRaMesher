@@ -1,24 +1,21 @@
 #include "LM_STM32WLx.h"
 
 #ifdef ARDUINO
-LM_STM32WLx::LM_STM32WLx(STM32WLx_Module* radioModule) {
-    module = new STM32WLx(radioModule);
+LM_STM32WLx::LM_STM32WLx() {
+    module = new STM32WLx(new STM32WLx_Module());
 }
 #else 
-LM_STM32WLx::LM_STM32WLx(Module* mod) {
+LM_STM32WLx::LM_STM32WLx(STM32WLx_Module* mod) {
     module = new STM32WLx(mod);
 }
 #endif
 
 int16_t LM_STM32WLx::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, int16_t preambleLength) {
-    int16_t state = module->begin(freq, bw, sf, cr, syncWord, power, preambleLength);
-    if (state == -706 || state == -707)
-        // tcxoVoltage – TCXO reference voltage to be set on DIO3. Defaults to 1.6 V. 
-        // If you are seeing -706/-707 error codes, it likely means you are using non-0 value for module with XTAL. 
-        // To use XTAL, either set this value to 0, or set SX126x::XTAL to true.
-        state = module->begin(freq, bw, sf, cr, syncWord, power, preambleLength, 0);
+    return module->begin(freq, bw, sf, cr, syncWord, power, preambleLength);
+}
 
-    return state;
+int16_t LM_STM32WLx::transmit(uint8_t* buffer, size_t length) {
+    return module->transmit(buffer, length);
 }
 
 int16_t LM_STM32WLx::receive(uint8_t* data, size_t len) {
@@ -46,10 +43,7 @@ void LM_STM32WLx::reset() {
 }
 
 int16_t LM_STM32WLx::setCRC(bool crc) {
-    if (crc)
-        return module->setCRC(2);
-    else
-        return module->setCRC(0);
+    return module->setCRC(crc);
 }
 
 size_t LM_STM32WLx::getPacketLength() {
@@ -68,10 +62,6 @@ int16_t LM_STM32WLx::readData(uint8_t* buffer, size_t numBytes) {
     return module->readData(buffer, numBytes);
 }
 
-int16_t LM_STM32WLx::transmit(uint8_t* buffer, size_t length) {
-    return module->transmit(buffer, length);
-}
-
 uint32_t LM_STM32WLx::getTimeOnAir(size_t length) {
     return module->getTimeOnAir(length);
 }
@@ -80,16 +70,16 @@ void LM_STM32WLx::setDioActionForReceiving(void (*action)()) {
     module->setDio1Action(action);
 }
 
-void LM_STM32WLx::setDioActionForReceivingTimeout(void(*action)()) {
-    return;
+void LM_STM32WLx::setDioActionForReceivingTimeout(void (*action)()) {
+    module->setDio1Action(action);  // Reuse DIO1 for timeout since DIO2 is unavailable
 }
 
-void LM_STM32WLx::setDioActionForScanning(void(*action)()) {
-    return;
+void LM_STM32WLx::setDioActionForScanning(void (*action)()) {
+    module->setDio1Action(action);
 }
 
-void LM_STM32WLx::setDioActionForScanningTimeout(void(*action)()) {
-    return;
+void LM_STM32WLx::setDioActionForScanningTimeout(void (*action)()) {
+    module->setDio1Action(action);  // Reuse DIO1 for timeout
 }
 
 void LM_STM32WLx::clearDioActions() {
@@ -124,10 +114,11 @@ int16_t LM_STM32WLx::setPreambleLength(int16_t preambleLength) {
     return module->setPreambleLength(preambleLength);
 }
 
+// Unsupported functions
 int16_t LM_STM32WLx::setGain(uint8_t gain) {
-    return 0;
+    return RADIOLIB_ERR_UNSUPPORTED;  // Return error code for unsupported functionality
 }
 
 int16_t LM_STM32WLx::setOutputPower(int8_t power, int8_t useRfo) {
-    return module->setOutputPower(power);
+    return RADIOLIB_ERR_UNSUPPORTED;  // Return error code for unsupported functionality
 }

@@ -88,7 +88,7 @@ public:
         size_t max_packet_size = LM_MAX_PACKET_SIZE;
 #ifdef ARDUINO
     #ifdef STM32WL
-       STM32WLx_Module* radioModule = nullptr;
+       //STM32WLx_Module* radioModule = nullptr;
     #else
         // Custom SPI pins
         SPIClass* spi = nullptr;

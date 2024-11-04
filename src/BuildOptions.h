@@ -2,11 +2,11 @@
 #define _LORAMESHER_BUILD_OPTIONS_H
 
 #ifndef ESP32
-#define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\n", tag, ##__VA_ARGS__)
-#define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\n", tag, ##__VA_ARGS__)
-#define ESP_LOGI(tag, format, ...) printf("[INFO] %s: " format "\n", tag, ##__VA_ARGS__)
-#define ESP_LOGW(tag, format, ...) printf("[WARN] %s: " format "\n", tag, ##__VA_ARGS__)
-#define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\n", tag, ##__VA_ARGS__)
+#define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGI(tag, format, ...) printf("[INFO] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGW(tag, format, ...) printf("[WARN] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\r\n", tag, ##__VA_ARGS__)
 #include "FreeRTOS.h"
 #include "portmacro.h"
 #include "semphr.h"
@@ -70,7 +70,13 @@ extern const char* LM_VERSION;
 #define LM_LORASF 7U
 #define LM_CODING_RATE 7U
 #define LM_PREAMBLE_LENGTH 8U
+
+#if defined STM32
 #define LM_POWER 6
+#else
+#define LM_POWER 6
+#endif
+
 #define LM_DUTY_CYCLE 100
 
 //Syncronization Word that identifies the mesh network

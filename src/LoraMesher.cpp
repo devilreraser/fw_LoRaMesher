@@ -134,14 +134,10 @@ void LoraMesher::initializeLoRa() {
 #ifdef ARDUINO
     #if STM32WL
     if (config.module == LoraModules::STM32WL_MOD) {
-        if (config.radioModule == nullptr) {
-            // Initialize STM32WLx_Module - this is STM32WL specific and does not require SPI
-            config.radioModule = new STM32WLx_Module();
-        }
         // Handle STM32WL initialization
         if (radio == nullptr) {
             ESP_LOGV(LM_TAG, "Using STM32WL module");
-            radio = new LM_STM32WLx(config.radioModule);  // Pass specific module as needed
+            radio = new LM_STM32WLx();  // Pass specific module as needed
         }
     } 
     #else
@@ -232,6 +228,8 @@ void LoraMesher::initializeLoRa() {
     // Set up the radio parameters
     ESP_LOGV(LM_TAG, "Initializing radio");
     int res = radio->begin(config.freq, config.bw, config.sf, config.cr, config.syncWord, config.power, config.preambleLength);
+    ESP_LOGV(LM_TAG, "config.power : %d", config.power);
+
     if (res != 0) {
         ESP_LOGE(LM_TAG, "Radio module gave error: %d", res);
     }
