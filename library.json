@@ -16,9 +16,8 @@
             "name": "Sergi Miralles"
         }
     ],
-    "dependencies": {
-		"https://github.com/devilreraser/RadioLib.git": "*"
-        //"jgromes/RadioLib": "^6.3.0"
+    "dependencies_commented": {
+		"jgromes/RadioLib": "^6.3.0"
     },
     "frameworks": "arduino",
     "platforms": "*",
