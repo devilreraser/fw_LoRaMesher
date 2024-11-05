@@ -17,7 +17,7 @@
 
 #define TAG "main"
 
-#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
+#define USE_AS_CONCENTRATOR   1       /* 0:endpoint 1:concentrator */
 
 //priority higher to lower
 #define USE_SBC_NodeMCU_ESP32       1
@@ -105,6 +105,126 @@ std::vector<dataPacket> previousBroadcastPayloads;
 const size_t maxBroadcastPayloads = 16;
 
 
+
+
+
+
+
+#define BUFFER_SIZE 128
+#define QUEUE_LENGTH 32
+
+static QueueHandle_t serialQueue = NULL;
+static SemaphoreHandle_t serialSemaphore = NULL;
+
+
+extern "C" int _write(int file, char *ptr, int len) {
+    // Ensure the length does not exceed BUFFER_SIZE
+    int copyLen = (len < BUFFER_SIZE) ? len : BUFFER_SIZE;
+
+    // Allocate memory for the message
+    char *buffer = (char *)pvPortMalloc(copyLen + 1);
+    if (buffer == NULL) {
+        // Handle memory allocation failure
+        return -1;
+    }
+
+    // Copy data and null-terminate
+    memcpy(buffer, ptr, copyLen);
+    buffer[copyLen] = '\0';
+
+    if (serialQueue == NULL) 
+    {
+        vPortFree(buffer);
+        return -1;
+    }
+
+    // Enqueue the buffer
+    if (xQueueSend(serialQueue, &buffer, portMAX_DELAY) != pdPASS) {
+        // Handle queue send failure
+        vPortFree(buffer);
+        return -1;
+    }
+
+    return len;  // Return the number of characters written
+}
+
+void serialTask(void *pvParameters) {
+    char *msg;
+
+
+
+    // Create the semaphore for UART print access
+    serialSemaphore = xSemaphoreCreateMutex();
+    if (serialSemaphore == NULL) {
+        Serial.println("Error creating serial print semaphore.");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    Serial.print("serialTask entered\r\n");
+
+    xSemaphoreGive(serialSemaphore);
+    printf("printf through queue Test Message\r\n");
+
+    #define LOOPS_PRINT_SERIAL_TASK_STACK  32
+    int print_stack_counter = LOOPS_PRINT_SERIAL_TASK_STACK;
+
+    for (;;) {
+        // Wait for a message to be available
+        if (xQueueReceive(serialQueue, &msg, portMAX_DELAY) == pdPASS) 
+        {
+            print_stack_counter++;
+            if (print_stack_counter >= LOOPS_PRINT_SERIAL_TASK_STACK)
+            {
+                print_stack_counter = 0;
+                ESP_LOGV("main", "Stack space unused after entering the task serialTask: %d", uxTaskGetStackHighWaterMark(NULL));
+                ESP_LOGV("main", "Free heap: %d", getFreeHeap());
+            }
+
+            // Output the message
+            if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
+                Serial.print(msg);
+                xSemaphoreGive(serialSemaphore);
+            }
+
+            // Free the allocated memory
+            vPortFree(msg);
+        }
+
+    }
+}
+
+
+
+void blinkTask(void *pvParameters) {
+    const int ledPin = LED_BUILTIN;
+
+    pinMode(ledPin, OUTPUT);
+
+    #define LOOPS_PRINT_BLINK_TASK_STACK    32
+    int print_stack_counter = LOOPS_PRINT_BLINK_TASK_STACK;
+
+    while (1) 
+    {
+        print_stack_counter++;
+        if (print_stack_counter >= LOOPS_PRINT_BLINK_TASK_STACK)
+        {
+            print_stack_counter = 0;
+            ESP_LOGV("main", "Stack space unused after entering the task blinkTask: %d", uxTaskGetStackHighWaterMark(NULL));
+            ESP_LOGV("main", "Free heap: %d", getFreeHeap());
+        }
+        digitalWrite(ledPin, HIGH);
+        printf("LED On\r\n");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        digitalWrite(ledPin, LOW);
+        printf("LED Off\r\n");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+
+
 //below not used used default Serial - left here only for notes how to do this
 // #ifndef ESP32
 // HardwareSerial Serial1(PB7, PB6); // RX, TX pins
@@ -114,133 +234,6 @@ const size_t maxBroadcastPayloads = 16;
 // #endif
 
 
-
-#ifndef ESP32
-
-// Sub-GHz handle
-SUBGHZ_HandleTypeDef hsubghz;
-
-
-#define LED_RED PA9
-
-// Queue handle and semaphore handle
-QueueHandle_t uartQueue;
-SemaphoreHandle_t uartSemaphore;
-
-void serial_printf(const char *format, ...);
-#endif
-
-
-void loopTask(void *pvParameters);
-
-#if 0
-extern "C" int _write(int file, char *ptr, int len) {
-    // Loop through the string and send each character to Serial
-    for (int i = 0; i < len; i++) {
-        Serial.write(ptr[i]);
-    }
-    return len; // Return the number of characters written
-}
-#else
-extern "C" int _write(int file, char *ptr, int len) {
-    // Copy the buffer to ensure null-termination
-    char buffer[129];  // 128 characters + 1 for null-termination
-    int copyLen = (len < 128) ? len : 128;  // Limit to buffer size
-    memcpy(buffer, ptr, copyLen);
-    buffer[copyLen] = '\0';  // Null-terminate the string
-
-    // Use serial_printf to output the buffer
-    serial_printf("%s", buffer);
-
-    return len;  // Return the number of characters written
-}
-#endif
-
-#ifndef ESP32
-
-// Custom printf function that uses the semaphore for thread-safe access
-void serial_printf(const char *format, ...) {
-    // Wait for semaphore before accessing Serial
-    if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE) {
-        char buffer[128];  // Buffer to hold the formatted string
-        va_list args;
-        va_start(args, format);
-        vsnprintf(buffer, sizeof(buffer), format, args);
-        va_end(args);
-
-        Serial.print(buffer);  // Send the formatted string to Serial
-
-        // Release the semaphore after printing
-        xSemaphoreGive(uartSemaphore);
-    }
-}
-
-void blinkTask(void *pvParameters) {
-    const int ledPin = LED_RED;
-
-    pinMode(ledPin, OUTPUT);
-    serial_printf("LED Init\r\n");
-
-    while (1) {
-        digitalWrite(ledPin, HIGH);
-        serial_printf("LED On\r\n");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        //vTaskDelay(10 / portTICK_PERIOD_MS);
-        //vTaskDelay(10000);
-
-        digitalWrite(ledPin, LOW);
-        serial_printf("LED Off\r\n");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        //vTaskDelay(10 / portTICK_PERIOD_MS);
-        //vTaskDelay(10000);
-    }
-}
-
-// Task to dequeue and print data from the UART queue
-void printTask(void *pvParameters) {
-    char* receivedData;
-
-    while (1) {
-        // Wait to receive a pointer to the data from the queue
-        if (xQueueReceive(uartQueue, &receivedData, portMAX_DELAY) == pdTRUE) {
-            serial_printf("Received: %s\r\n", receivedData);  // Print the received data as a string
-
-            // Free the allocated memory after processing
-            vPortFree(receivedData);
-        }
-    }
-}
-
-
-
-void initialize_blink_and_print(void)
-{
-    Serial.begin(115200);
-    while (!Serial);      // Wait for Serial to initialize
-    Serial.println("");
-    Serial.println("");
-    Serial.println("UART Initialized.");
-
-    // Create the semaphore for UART access
-    uartSemaphore = xSemaphoreCreateMutex();
-    if (uartSemaphore == NULL) {
-        Serial.println("Error creating semaphore.");
-        while (1);  // Halt if semaphore creation fails
-    }
-
-    // Initialize the queue to hold pointers to data buffers
-    uartQueue = xQueueCreate(10, sizeof(char*));  // Queue holds up to 10 pointers
-    if (uartQueue == NULL) {
-        Serial.println("Error creating queue.");
-        while (1);  // Halt if queue creation fails
-    }
-
-    // Create tasks for LED blinking and Serial data handling
-    xTaskCreate(blinkTask, "Blink Task", 128, NULL, 1, NULL);
-    xTaskCreate(printTask, "Print Task", 256, NULL, 1, NULL);
-}
-
-#endif
 
 #ifdef BOARD_LED
 //Led flash
@@ -255,55 +248,39 @@ void led_Flash(uint16_t flashes, uint16_t delaymS) {
 }
 #endif
 
+
+
 void printRouteNode(RouteNode* routeNode) {
-    Serial.print("Destination: ");
-    Serial.print(routeNode->networkNode.address, HEX);  // Destination node address in hexadecimal
-
-    Serial.print(" | Metric: ");
-    Serial.print(routeNode->networkNode.metric);  // Metric associated with this route
-
-    Serial.print(" | Next Hop (via): ");
-    Serial.print(routeNode->via, HEX);  // Next hop address in hexadecimal
-
-    Serial.print(" | Hop Count: ");
-    Serial.print(routeNode->networkNode.hop_count);  // Number of hops to the destination
-
-    Serial.print(" | Received SNR: ");
-    Serial.print(routeNode->receivedSNR);  // Signal-to-noise ratio for received packets
-
-    Serial.print(" | Sent SNR: ");
-    Serial.print(routeNode->sentSNR);  // Signal-to-noise ratio for sent packets
-
-    Serial.print(" | Received Link Quality: ");
-    Serial.print(routeNode->received_link_quality);  // Link quality for received packets
-
-    Serial.print(" | Transmitted Link Quality: ");
-    Serial.print(routeNode->transmitted_link_quality);  // Link quality for transmitted packets
-
-    Serial.print(" | SRTT: ");
-    Serial.print(routeNode->SRTT);  // Smoothed round-trip time
-
-    Serial.print(" | RTTVAR: ");
-    Serial.print(routeNode->RTTVAR);  // Round-trip time variation
-
-    Serial.print(" | Received Metric: ");
-    Serial.println(routeNode->receivedMetric);  // Received metric for this route
+    printf("Destination: %04X | Metric: %d | Next Hop (via): %04X | Hop Count: %d | Rx SNR: %d | Tx SNR: %d | Rx RSSI: %d | Tx RSSI: %d | SRTT: %d | RTTVAR: %d | Rx Metric: %d\r\n"
+        , routeNode->networkNode.address    // Destination node address in hexadecimal
+        , routeNode->networkNode.metric     // Metric associated with this route
+        , routeNode->via                    // Next hop address in hexadecimal
+        , routeNode->networkNode.hop_count  // Number of hops to the destination
+        , routeNode->receivedSNR            // Signal-to-noise ratio for received packets
+        , routeNode->sentSNR                // Signal-to-noise ratio for sent packets
+        , routeNode->received_link_quality  // Link quality for received packets
+        , routeNode->transmitted_link_quality   //Link quality for transmitted packets
+        , routeNode->SRTT                   // Smoothed round-trip time
+        , routeNode->RTTVAR                 // Round-trip time variation
+        , routeNode->receivedMetric         // Received metric for this route
+        );
 }
 
 void printRoutingTable() {
     // Get a copy of the routing table
     LM_LinkedList<RouteNode>* routingTable = radio.routingTableListCopy();
-
+    
     if (routingTable->getLength() > 0) {
-        Serial.println("Routing Table:");
+        printf("Routing Table:\r\n");
         routingTable->each(printRouteNode);  // Apply the print function to each route node
     } else {
-        Serial.println("Routing Table is empty.");
+        printf("Routing Table is empty.\r\n");
     }
 
     // Delete the copied routing table to prevent memory leaks
     delete routingTable;
-    Serial.println();  // Add a blank line for readability
+    printf("\r\n");  // Add a blank line for readability
+   
 }
 
 /**
@@ -312,7 +289,7 @@ void printRoutingTable() {
  * @param data
  */
 void printPacket(dataPacket data) {
-    Serial.printf("Packet receive from %04X Nº %3d index\r\n", data.id_sender, data.counter);
+    printf("Packet receive from %04X Nº %3d index\r\n", data.id_sender, data.counter);
 }
 
 /**
@@ -321,7 +298,7 @@ void printPacket(dataPacket data) {
  * @param packet
  */
 void printDataPacket(AppPacket<dataPacket>* packet) {
-    Serial.printf("Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
+    printf("Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
 
     //Get the payload to iterate through it
     dataPacket* dPacket = packet->payload;
@@ -335,10 +312,10 @@ void printDataPacket(AppPacket<dataPacket>* packet) {
 void printMessageCounts() {
     uint16_t id_spare = 0;
     uint16_t messages_spare = 0;
-    Serial.printf("----------------------------------------------\r\n");
-    Serial.printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
-    Serial.printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
-    Serial.printf("----------------------------------------------\r\n");
+    printf("----------------------------------------------\r\n");
+    printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
+    printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
+    printf("----------------------------------------------\r\n");
 }
 /**
  * @brief Function that process the received packets
@@ -348,6 +325,10 @@ void processReceivedPackets(void*) {
     for (;;) {
         /* Wait for the notification of processReceivedPackets and enter blocking */
         ulTaskNotifyTake(pdPASS, portMAX_DELAY);
+
+        ESP_LOGV("main", "Stack space unused after entering the task processReceivedPackets: %d", uxTaskGetStackHighWaterMark(NULL));
+        ESP_LOGV("main", "Free heap: %d", getFreeHeap());
+
 
         //Iterate through all the packets inside the Received User Packets Queue
         while (radio.getReceivedQueueSize() > 0) {
@@ -469,7 +450,7 @@ void createReceiveMessages() {
     int res = xTaskCreate(
         processReceivedPackets,
         "Receive App Task",
-        4096,
+        2048,
         (void*) 1,
         2,
         &receiveLoRaMessage_Handle);
@@ -489,6 +470,10 @@ void processLedIndcation(void*) {
         uint16_t rgb_code =0b000;
         if (xQueueReceive(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(100)) == pdPASS) {
             ESP_LOGV(TAG, "Data received from Led RGB queue: %X", rgb_code);
+
+            ESP_LOGV("main", "Stack space unused after entering the task processLedIndcation: %d", uxTaskGetStackHighWaterMark(NULL));
+            ESP_LOGV("main", "Free heap: %d", getFreeHeap());
+
 
             //digitalWrite(BOARD_LED, LED_ON);
             if (rgb_code & 0b100) digitalWrite(RGB_RED, LOW);
@@ -519,7 +504,7 @@ void processLedIndcation(void*) {
 
             vTaskDelay(200 / portTICK_PERIOD_MS);
         } else {
-            //Serial.println("No data received.");
+            //printf("No data received.\r\n");
         }
 
 
@@ -560,13 +545,16 @@ void processLedSendIndcation(void*) {
         if (xQueueReceive(uint16LedQueue, &code, pdMS_TO_TICKS(100)) == pdPASS) {
             ESP_LOGV(TAG, "Data received from Led Send queue: %X", code);
 
+            ESP_LOGV("main", "Stack space unused after entering the task processLedSendIndcation: %d", uxTaskGetStackHighWaterMark(NULL));
+            ESP_LOGV("main", "Free heap: %d", getFreeHeap());
+
             digitalWrite(BOARD_LED, LED_ON);
             vTaskDelay(100 / portTICK_PERIOD_MS);
             digitalWrite(BOARD_LED, LED_OFF);
 
             vTaskDelay(200 / portTICK_PERIOD_MS);
         } else {
-            //Serial.println("No data received.");
+            //printf("No data received.\r\n");
         }
 
 
@@ -588,7 +576,7 @@ void createLedSendIndication() {
         2,
         &ledSendIndcation_Handle);
     if (res != pdPASS) {
-        Serial.printf("Error: Led Send Indication Task creation gave error: %d\r\n", res);
+        printf("Error: Led Send Indication Task creation gave error: %d\r\n", res);
     }
 }
 #endif
@@ -683,138 +671,22 @@ void setupLoraMesher() {
     //Start LoRaMesher
     radio.start();
 
-    Serial.println("Lora initialized");
+    printf("Lora initialized\r\n");
 }
 
 
-void setup() {
-    Serial.begin(115200);
 
+void MesherTask(void *pvParameters) {
+    // This replaces the `loop()` function with main Mesher Function
 
-    // HAL initialization
-    //HAL_Init();
-    //SystemClock_Config();
-    // Enable the Sub-GHz radio
-    //__HAL_RCC_SUBGHZSPI_CLK_ENABLE();
-
-    // Initialize the Sub-GHz radio
-    //HAL_SUBGHZ_Init(&hsubghz);
-
-    #ifndef ESP32
-    initialize_blink_and_print();
-    #endif
-
-
-    Serial.println("initBoard");
-
-#ifdef BOARD_LED  
-    pinMode(BOARD_LED, OUTPUT); //setup pin as output for indicator LED
-#endif
-
-    #if USE_SBC_NodeMCU_ESP32
-#ifdef RGB_RED  
-    // pinMode(LORA_ENABLE, OUTPUT); //setup pin as output for LoRa EN
-    pinMode(RGB_RED, OUTPUT); //setup pin as output for indicator LED
-    pinMode(RGB_ANODE, OUTPUT); //setup pin as output for indicator LED
-    pinMode(RGB_GREEN, OUTPUT); //setup pin as output for indicator LED
-    pinMode(RGB_BLUE, OUTPUT); //setup pin as output for indicator LED  
-    digitalWrite(RGB_ANODE, HIGH);
-    // delay(100); //in ms
-    digitalWrite(RGB_RED, HIGH);
-    digitalWrite(RGB_GREEN, HIGH);
-    digitalWrite(RGB_BLUE, HIGH);
-#endif
-    #endif
-
-#ifdef BOARD_LED
-    led_Flash(2, 125);          //two quick LED flashes to indicate program start
-#endif
-
-#ifdef RGB_RED  
-    uint16LedRGBQueue = xQueueCreate(10, sizeof(uint16_t));
-    if (uint16LedRGBQueue == nullptr) {
-        ESP_LOGE(TAG, "Failed to create queue RGB.");
-    } else {
-        ESP_LOGV(TAG, "Queue RGB created successfully.");
-
-        uint16_t rgb_code = 0b111;  //white
-        if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
-            ESP_LOGV(TAG, "Data sent to queue RGB. %X", rgb_code);
-        } else {
-            ESP_LOGE(TAG, "Failed to send data to queue RGB.");
-        }
-    }
-
-    createLedIndication();
-#endif
-
-
-#ifdef BOARD_LED
-    uint16LedQueue = xQueueCreate(10, sizeof(uint16_t));
-    if (uint16LedQueue == nullptr) {
-        ESP_LOGE(TAG, "Failed to create queue LED.");
-    } else {
-        ESP_LOGV(TAG, "Queue LED created successfully.");
-
-        uint16_t code = 0b1; //on
-        if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
-            ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
-        } else {
-            ESP_LOGE(TAG, "Failed to send data to queue LED.");
-        }
-    }
-    createLedSendIndication();
-#endif
-
-
-    //setupLoraMesher();
-
-
-
-#ifdef RGB_RED  
-    uint16_t rgb_code = 0b111;  //white
-    if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
-        ESP_LOGV(TAG, "Data sent to queue RGB. %X", rgb_code);
-    } else {
-        ESP_LOGE(TAG, "Failed to send data to queue RGB.");
-    }
-#endif
-
-
-#ifdef BOARD_LED
-    uint16_t code = 0b1;  //on
-    if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
-        ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
-    } else {
-        ESP_LOGE(TAG, "Failed to send data to queue LED.");
-    }
-#endif
+    setupLoraMesher();
 
     helloPacket->id_sender = radio.getLocalAddress();
 
 
-    // Create the main task
-    xTaskCreate(
-        loopTask,          // Task function
-        "LoopTask",        // Name of the task
-        1024,              // Stack size (adjust as needed)
-        NULL,              // Parameters (not used here)
-        1,                 // Task priority (1 is low priority)
-        NULL               // Task handle (optional, not needed here)
-    );
-
-
-    #ifndef ESP32
-    vTaskStartScheduler();
-    #endif
-
-}
-
-void loopTask(void *pvParameters) {
-    // This replaces the `loop()` function
     bool concentrator = USE_AS_CONCENTRATOR;
-    Serial.printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
-    Serial.printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
+    printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
+    printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
     for (;;) {
         if (concentrator)
         {
@@ -895,38 +767,150 @@ void loopTask(void *pvParameters) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         //delay(5000);
         #endif
-
-        // // Use semaphore to make Serial output thread-safe
-        // if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE) {
-        //     Serial.print("Loop: ");
-        //     Serial.print(millis());  // Print elapsed time in milliseconds
-        //     Serial.println(" ms");
-        //     Serial.print("portTICK_PERIOD_MS: ");
-        //     Serial.println(portTICK_PERIOD_MS);  
-        //     Serial.print("configTICK_RATE_HZ: ");
-        //     Serial.println(configTICK_RATE_HZ);  
-        //     Serial.print("configCPU_CLOCK_HZ: ");
-        //     Serial.println(configCPU_CLOCK_HZ);  
-        //     xSemaphoreGive(uartSemaphore);
-        // }
     }
+}
+
+void setup() {
+
+    int res;
+
+    Serial.begin(115200);
+    while (!Serial);      // Wait for Serial to initialize
+    Serial.println("");
+    Serial.println("");
+    Serial.println("UART Initialized.");
+
+
+    // Create the queue
+    serialQueue = xQueueCreate(QUEUE_LENGTH, sizeof(char *));
+    if (serialQueue == NULL) {
+        Serial.println("Error creating serial print queue.");
+        return;
+    }
+
+    Serial.print("serialQueue created\r\n");
+
+    // Create task for printf -> Serial handling
+    res = xTaskCreate(serialTask,"SerialTask", 512, NULL, 1, NULL);
+    if (res != pdPASS) {
+        ESP_LOGE("main", "SerialTask creation gave error: %d", res);
+    }
+
+    // Create task for LED blinking handling
+    res = xTaskCreate(blinkTask, "Blink Task", 128, NULL, 1, NULL);
+    if (res != pdPASS) {
+        ESP_LOGE("main", "Blink Task creation gave error: %d", res);
+    }
+
+    printf("initBoard \r\n");
+    ESP_LOGI("main", "configMINIMAL_STACK_SIZE: %d", configMINIMAL_STACK_SIZE);
+    ESP_LOGI("main", "configTOTAL_HEAP_SIZE: %d", configTOTAL_HEAP_SIZE);
+
+
+#ifdef BOARD_LED  
+    pinMode(BOARD_LED, OUTPUT); //setup pin as output for indicator LED
+#endif
+
+    #if USE_SBC_NodeMCU_ESP32
+#ifdef RGB_RED  
+    // pinMode(LORA_ENABLE, OUTPUT); //setup pin as output for LoRa EN
+    pinMode(RGB_RED, OUTPUT); //setup pin as output for indicator LED
+    pinMode(RGB_ANODE, OUTPUT); //setup pin as output for indicator LED
+    pinMode(RGB_GREEN, OUTPUT); //setup pin as output for indicator LED
+    pinMode(RGB_BLUE, OUTPUT); //setup pin as output for indicator LED  
+    digitalWrite(RGB_ANODE, HIGH);
+    // delay(100); //in ms
+    digitalWrite(RGB_RED, HIGH);
+    digitalWrite(RGB_GREEN, HIGH);
+    digitalWrite(RGB_BLUE, HIGH);
+#endif
+    #endif
+
+#ifdef BOARD_LED
+    led_Flash(2, 125);          //two quick LED flashes to indicate program start
+#endif
+
+#ifdef RGB_RED  
+    uint16LedRGBQueue = xQueueCreate(10, sizeof(uint16_t));
+    if (uint16LedRGBQueue == nullptr) {
+        ESP_LOGE(TAG, "Failed to create queue RGB.");
+    } else {
+        ESP_LOGV(TAG, "Queue RGB created successfully.");
+
+        uint16_t rgb_code = 0b111;  //white
+        if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
+            ESP_LOGV(TAG, "Data sent to queue RGB. %X", rgb_code);
+        } else {
+            ESP_LOGE(TAG, "Failed to send data to queue RGB.");
+        }
+    }
+
+    createLedIndication();
+#endif
+
+
+#ifdef BOARD_LED
+    uint16LedQueue = xQueueCreate(10, sizeof(uint16_t));
+    if (uint16LedQueue == nullptr) {
+        ESP_LOGE(TAG, "Failed to create queue LED.");
+    } else {
+        ESP_LOGV(TAG, "Queue LED created successfully.");
+
+        uint16_t code = 0b1; //on
+        if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
+            ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
+        } else {
+            ESP_LOGE(TAG, "Failed to send data to queue LED.");
+        }
+    }
+    createLedSendIndication();
+#endif
+
+
+
+
+
+
+#ifdef RGB_RED  
+    uint16_t rgb_code = 0b111;  //white
+    if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
+        ESP_LOGV(TAG, "Data sent to queue RGB. %X", rgb_code);
+    } else {
+        ESP_LOGE(TAG, "Failed to send data to queue RGB.");
+    }
+#endif
+
+
+#ifdef BOARD_LED
+    uint16_t code = 0b1;  //on
+    if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
+        ESP_LOGV(TAG, "Data sent to queue LED. %X", code);
+    } else {
+        ESP_LOGE(TAG, "Failed to send data to queue LED.");
+    }
+#endif
+
+
+    // Create task for printf -> Serial handling
+    res = xTaskCreate(MesherTask,"MesherTask",1024, NULL, 1, NULL);
+    if (res != pdPASS) {
+        ESP_LOGE("main", "MesherTask creation gave error: %d", res);
+    }
+
+    #ifndef ESP32
+    vTaskStartScheduler();
+    #endif
+
 }
 
 void loop() {
 
     for (;;) {
+
+        printf("[loop printf] Loop: %d ms\r\n", millis());  // Print elapsed time in milliseconds
+        printf("[loop printf] portTICK_PERIOD_MS: %d\r\n", portTICK_PERIOD_MS);
+        printf("[loop printf] configTICK_RATE_HZ: %d\r\n", configTICK_RATE_HZ);
+        printf("[loop printf] configCPU_CLOCK_HZ: %d\r\n", configCPU_CLOCK_HZ);
         delay(5000);
-        if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE) {
-            Serial.print("Loop: ");
-            Serial.print(millis());  // Print elapsed time in milliseconds
-            Serial.println(" ms");
-            Serial.print("portTICK_PERIOD_MS: ");
-            Serial.println(portTICK_PERIOD_MS);  
-            Serial.print("configTICK_RATE_HZ: ");
-            Serial.println(configTICK_RATE_HZ);  
-            Serial.print("configCPU_CLOCK_HZ: ");
-            Serial.println(configCPU_CLOCK_HZ);  
-            xSemaphoreGive(uartSemaphore);
-        }
     }
 }

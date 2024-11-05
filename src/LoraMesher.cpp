@@ -321,7 +321,7 @@ void LoraMesher::initializeSchedulers() {
     int res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        4096,
+        1024,
         this,
         6,
         &ReceivePacket_TaskHandle);
@@ -331,7 +331,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendPackets(); },
         "Sending routine",
-        2048,
+        1024,
         this,
         5,
         &SendData_TaskHandle);
@@ -341,7 +341,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendHelloPacketRoutine(); },
         "Hello routine",
-        2048,
+        1024,
         this,
         4,
         &Hello_TaskHandle);
@@ -361,7 +361,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->routingTableManager(); },
         "Routing Table Manager routine",
-        2048,
+        1024,
         this,
         2,
         &RoutingTableManager_TaskHandle);
@@ -423,7 +423,7 @@ void LoraMesher::receivingRoutine() {
             portMAX_DELAY);
 
         if (TWres == pdPASS) {
-            ESP_LOGV(LM_TAG, "Stack space unused after entering the task: %d", uxTaskGetStackHighWaterMark(NULL));
+            ESP_LOGV(LM_TAG, "Stack space unused after entering the task receivingRoutine: %d", uxTaskGetStackHighWaterMark(NULL));
             ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
             hasReceivedMessage = true;
@@ -556,7 +556,7 @@ void LoraMesher::sendPackets() {
         /* Wait for the notification of new packet has to be sent and enter blocking */
         ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 
-        ESP_LOGV(LM_TAG, "Stack space unused after entering the task: %d", uxTaskGetStackHighWaterMark(NULL));
+        ESP_LOGV(LM_TAG, "Stack space unused after entering the task sendPackets: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
         while (ToSendPackets->getLength() > 0) {
@@ -764,7 +764,7 @@ void LoraMesher::processPackets() {
     vTaskSuspend(NULL);
 
     for (;;) {
-        ESP_LOGV(LM_TAG, "Stack space unused after entering the task: %d", uxTaskGetStackHighWaterMark(NULL));
+        ESP_LOGV(LM_TAG, "Stack space unused after entering the task processPackets: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
         /* Wait for the notification of receivingRoutine and enter blocking */
@@ -845,7 +845,7 @@ void LoraMesher::routingTableManager() {
 
     for (;;) {
         ESP_LOGV(LM_TAG, "Routing Table Manager routine");
-        ESP_LOGV(LM_TAG, "Stack space unused after entering the task: %d", uxTaskGetStackHighWaterMark(NULL));
+        ESP_LOGV(LM_TAG, "Stack space unused after entering the task routingTableManager: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
         RoutingTableService::manageTimeoutRoutingTable();
@@ -866,7 +866,7 @@ void LoraMesher::queueManager() {
     vTaskSuspend(NULL);
 
     for (;;) {
-        ESP_LOGV(LM_TAG, "Stack space unused after entering the task: %d", uxTaskGetStackHighWaterMark(NULL));
+        ESP_LOGV(LM_TAG, "Stack space unused after entering the task queueManager: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
         // Record the state for the simulation
