@@ -217,6 +217,8 @@ void initialize_blink_and_print(void)
 {
     Serial.begin(115200);
     while (!Serial);      // Wait for Serial to initialize
+    Serial.println("");
+    Serial.println("");
     Serial.println("UART Initialized.");
 
     // Create the semaphore for UART access
@@ -637,6 +639,29 @@ void setupLoraMesher() {
     #else
     config.module = LoraMesher::LoraModules::SX1276_MOD; // For ESP32 LoRa module
     #endif
+
+
+    // #ifdef LORA_E5_DEV_BOARD
+    // // set RF switch configuration for Nucleo WL55JC1
+    // // NOTE: other boards may be different!
+    // //       Some boards may not have either LP or HP.
+    // //       For those, do not set the LP/HP entry in the table.
+    // static const uint32_t rfswitch_pins[] =
+    //                         {PC3,  PC4,  PC5, RADIOLIB_NC, RADIOLIB_NC};
+    // static const Module::RfSwitchMode_t rfswitch_table[] = {
+    //     {STM32WLx::MODE_IDLE,  {LOW,  LOW,  LOW}},
+    //     {STM32WLx::MODE_RX,    {HIGH, HIGH, LOW}},
+    //     {STM32WLx::MODE_TX_LP, {HIGH, HIGH, HIGH}},
+    //     {STM32WLx::MODE_TX_HP, {HIGH, LOW,  HIGH}},
+    //     END_OF_MODE_TABLE,
+    // };
+
+    // // set RF switch control configuration
+    // // this has to be done prior to calling begin()
+    // radio.setRfSwitchTable(rfswitch_pins, rfswitch_table);
+    // #endif
+
+
     //Init the loramesher with a configuration
     radio.begin(config);
 
@@ -742,7 +767,7 @@ void setup() {
 #endif
 
 
-    setupLoraMesher();
+    //setupLoraMesher();
 
 
 
