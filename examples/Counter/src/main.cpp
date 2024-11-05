@@ -11,7 +11,8 @@
 #include "queue.h"
 #endif
 
-
+/* Section below For Task Debugging - Comment out for normal operation */
+#define DEBUG_NO_USE_RECEIVED_APP_MESSAGES      
 
 #include <vector>
 
@@ -110,7 +111,7 @@ const size_t maxBroadcastPayloads = 16;
 
 
 
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 192
 #define QUEUE_LENGTH 32
 
 static QueueHandle_t serialQueue = NULL;
@@ -450,7 +451,7 @@ void createReceiveMessages() {
     int res = xTaskCreate(
         processReceivedPackets,
         "Receive App Task",
-        2048,
+        1024,
         (void*) 1,
         2,
         &receiveLoRaMessage_Handle);
@@ -653,13 +654,13 @@ void setupLoraMesher() {
     //Init the loramesher with a configuration
     radio.begin(config);
 
-
+    #ifndef DEBUG_NO_USE_RECEIVED_APP_MESSAGES
     //Create the receive task and add it to the LoRaMesher
     createReceiveMessages();
 
     //Set the task handle to the LoRaMesher
     radio.setReceiveAppDataTaskHandle(receiveLoRaMessage_Handle);
-
+    #endif
 
     #if USE_SBC_NodeMCU_ESP32
     // digitalWrite(LORA_ENABLE, ENABLE_OFF);
@@ -740,7 +741,7 @@ void MesherTask(void *pvParameters) {
 
 
         printRoutingTable();
-
+#if 0
         ESP_LOGV(TAG, "routingTableSize                 %d", radio.routingTableSize());
         ESP_LOGV(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
         ESP_LOGV(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
@@ -757,6 +758,7 @@ void MesherTask(void *pvParameters) {
         ESP_LOGV(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
         ESP_LOGV(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
         ESP_LOGV(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
+#endif
 
         #if USE_AS_CONCENTRATOR
         //Wait 5 seconds to send the next packet
@@ -791,12 +793,12 @@ void setup() {
     Serial.print("serialQueue created\r\n");
 
     // Create task for printf -> Serial handling
-    res = xTaskCreate(serialTask,"SerialTask", 512, NULL, 1, NULL);
+    res = xTaskCreate(serialTask,"SerialTask", 256, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "SerialTask creation gave error: %d", res);
     }
 
-    // Create task for LED blinking handling
+    //Create task for LED blinking handling
     res = xTaskCreate(blinkTask, "Blink Task", 128, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "Blink Task creation gave error: %d", res);
@@ -905,12 +907,13 @@ void setup() {
 
 void loop() {
 
-    for (;;) {
+    // for (;;) {
 
-        printf("[loop printf] Loop: %d ms\r\n", millis());  // Print elapsed time in milliseconds
-        printf("[loop printf] portTICK_PERIOD_MS: %d\r\n", portTICK_PERIOD_MS);
-        printf("[loop printf] configTICK_RATE_HZ: %d\r\n", configTICK_RATE_HZ);
-        printf("[loop printf] configCPU_CLOCK_HZ: %d\r\n", configCPU_CLOCK_HZ);
-        delay(5000);
-    }
+    //     printf("[loop printf] Loop: %d ms\r\n", millis());  // Print elapsed time in milliseconds
+    //     printf("[loop printf] portTICK_PERIOD_MS: %d\r\n", portTICK_PERIOD_MS);
+    //     printf("[loop printf] configTICK_RATE_HZ: %d\r\n", configTICK_RATE_HZ);
+    //     printf("[loop printf] configCPU_CLOCK_HZ: %d\r\n", configCPU_CLOCK_HZ);
+    //     delay(5000);
+    // }
+    return;
 }
