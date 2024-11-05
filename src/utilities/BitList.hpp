@@ -3,49 +3,49 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <stdexcept>
+#include <cstdio>
+#include <algorithm>
 
 class BitList {
 public:
-    BitList(size_t bitCount): size((bitCount + 7) / 8), currentIndex(0) {
+    BitList(size_t bitCount): size((bitCount + 7) / 8), currentIndex(0), isValid(true) {
         bits = static_cast<uint8_t*>(malloc(size));
         if (!bits) {
-            throw std::bad_alloc();
+            isValid = false;  // Set a flag if allocation fails
+            return;
         }
         std::fill(bits, bits + size, 0);
     }
 
     ~BitList() {
-        free(bits);
+        if (bits) free(bits);
     }
 
-    void addBit(bool bit) {
+    bool addBit(bool bit) {
+        if (!isValid) return false;  // Check if allocation was successful
+
         if (bit) {
             bits[currentIndex / 8] |= (1 << (currentIndex % 8));
-        }
-        else {
+        } else {
             bits[currentIndex / 8] &= ~(1 << (currentIndex % 8));
         }
-        if (currentIndex == size * 8) {
-            currentIndex = 0;
-            return;
-        }
-
+        
         currentIndex = (currentIndex + 1) % (size * 8);
+        return true;
     }
 
     bool getBit(size_t index) const {
-        if (index >= size * 8) {
-            throw std::out_of_range("Index out of range");
-        }
+        if (!isValid || index >= size * 8) return false;  // Check for valid access
         return bits[index / 8] & (1 << (index % 8));
     }
 
     size_t getSize() const {
-        return size * 8;
+        return isValid ? size * 8 : 0;
     }
 
     size_t countBits() const {
+        if (!isValid) return 0;
+
         size_t count = 0;
         for (size_t i = 0; i < size; ++i) {
             count += __builtin_popcount(bits[i]);
@@ -54,6 +54,11 @@ public:
     }
 
     void printBits() const {
+        if (!isValid) {
+            printf("Error: Invalid BitList\n");
+            return;
+        }
+
         printf("Bits: ");
         for (size_t i = 0; i < size; ++i) {
             for (size_t j = 0; j < 8; ++j) {
@@ -64,14 +69,21 @@ public:
     }
 
     void clear() {
-        std::fill(bits, bits + size, 0);
-        currentIndex = 0;
+        if (isValid) {
+            std::fill(bits, bits + size, 0);
+            currentIndex = 0;
+        }
+    }
+
+    bool isValidBitList() const {
+        return isValid;
     }
 
 private:
     size_t size;
     uint8_t* bits;
     size_t currentIndex;
+    bool isValid;  // New flag to check allocation status
 };
 
 #endif // BIT_LIST_H

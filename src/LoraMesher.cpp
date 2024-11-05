@@ -139,6 +139,29 @@ void LoraMesher::initializeLoRa() {
             ESP_LOGV(LM_TAG, "Using STM32WL module");
             radio = new LM_STM32WLx();  // Pass specific module as needed
         }
+
+
+        #ifdef LORA_E5_DEV_BOARD
+        // set RF switch configuration for Nucleo WL55JC1
+        // NOTE: other boards may be different!
+        //       Some boards may not have either LP or HP.
+        //       For those, do not set the LP/HP entry in the table.
+        static const uint32_t rfswitch_pins[] =
+                                {PC3,  PC4,  PC5, RADIOLIB_NC, RADIOLIB_NC};
+        static const Module::RfSwitchMode_t rfswitch_table[] = {
+            {STM32WLx::MODE_IDLE,  {LOW,  LOW,  LOW}},
+            {STM32WLx::MODE_RX,    {HIGH, HIGH, LOW}},
+            {STM32WLx::MODE_TX_LP, {HIGH, HIGH, HIGH}},
+            {STM32WLx::MODE_TX_HP, {HIGH, LOW,  HIGH}},
+            END_OF_MODE_TABLE,
+        };
+
+        // set RF switch control configuration
+        // this has to be done prior to calling begin()
+        radio->setRfSwitchTable(rfswitch_pins, rfswitch_table);
+        #endif
+
+
     } 
     #else
     if (config.spi == nullptr) {
@@ -308,7 +331,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendPackets(); },
         "Sending routine",
-        4096,
+        2048,
         this,
         5,
         &SendData_TaskHandle);
@@ -318,27 +341,27 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendHelloPacketRoutine(); },
         "Hello routine",
-        4096,
+        2048,
         this,
         4,
         &Hello_TaskHandle);
     if (res != pdPASS) {
-        ESP_LOGE(LM_TAG, "Process Task creation gave error: %d", res);
+        ESP_LOGE(LM_TAG, "Process Task Hello creation gave error: %d", res);
     }
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->processPackets(); },
         "Process routine",
-        4096,
+        2048,
         this,
         3,
         &ReceiveData_TaskHandle);
     if (res != pdPASS) {
-        ESP_LOGE(LM_TAG, "Process Task creation gave error: %d", res);
+        ESP_LOGE(LM_TAG, "Process Task RxDat creation gave error: %d", res);
     }
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->routingTableManager(); },
         "Routing Table Manager routine",
-        4096,
+        2048,
         this,
         2,
         &RoutingTableManager_TaskHandle);
@@ -348,7 +371,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->queueManager(); },
         "Queue Manager routine",
-        4096,
+        2048,
         this,
         2,
         &QueueManager_TaskHandle);

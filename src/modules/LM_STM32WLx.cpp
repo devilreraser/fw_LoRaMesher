@@ -10,6 +10,10 @@ LM_STM32WLx::LM_STM32WLx(STM32WLx_Module* mod) {
 }
 #endif
 
+void LM_STM32WLx::setRfSwitchTable(const uint32_t (&pins)[Module::RFSWITCH_MAX_PINS], const Module::RfSwitchMode_t table[]) {
+    module->setRfSwitchTable(pins, table);
+}
+
 int16_t LM_STM32WLx::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, int16_t preambleLength) {
     return module->begin(freq, bw, sf, cr, syncWord, power, preambleLength);
 }

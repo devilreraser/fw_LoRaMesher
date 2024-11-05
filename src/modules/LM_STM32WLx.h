@@ -11,6 +11,7 @@ public:
     LM_STM32WLx(STM32WLx_Module* module);
 #endif
 
+    void setRfSwitchTable(const uint32_t (&pins)[Module::RFSWITCH_MAX_PINS], const Module::RfSwitchMode_t table[]) override;
     // Initialization
     int16_t begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord,
                   int8_t power, int16_t preambleLength) override;
