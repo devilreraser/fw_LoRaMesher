@@ -4,6 +4,11 @@
 #include "EspHal.h"
 #endif
 
+/* Section below For Task Debugging - Comment out for normal operation */
+#define DEBUG_NO_USE_QUEUE_MANAGER
+#define DEBUG_NO_USE_ROUTE_MANAGER
+#define DEBUG_NO_USE_RECEIVE_DATA
+#define DEBUG_NO_USE_RECEIVE_PACKET
 
 LoraMesher::LoraMesher() {}
 
@@ -40,12 +45,20 @@ void LoraMesher::standby() {
     clearDioActions();
 
     //Suspend all tasks
+    #ifndef DEBUG_NO_USE_RECEIVE_PACKET
     vTaskSuspend(ReceivePacket_TaskHandle);
+    #endif
     vTaskSuspend(Hello_TaskHandle);
+    #ifndef DEBUG_NO_USE_RECEIVE_DATA
     vTaskSuspend(ReceiveData_TaskHandle);
+    #endif
     vTaskSuspend(SendData_TaskHandle);
+    #ifndef DEBUG_NO_USE_ROUTE_MANAGER
     vTaskSuspend(RoutingTableManager_TaskHandle);
+    #endif
+    #ifndef DEBUG_NO_USE_QUEUE_MANAGER
     vTaskSuspend(QueueManager_TaskHandle);
+    #endif
 
     //Set previous priority
     vTaskPrioritySet(NULL, prevPriority);
@@ -59,12 +72,20 @@ void LoraMesher::start() {
     vTaskPrioritySet(NULL, configMAX_PRIORITIES - 1);
 
     // Resume all tasks
+    #ifndef DEBUG_NO_USE_RECEIVE_PACKET
     vTaskResume(ReceivePacket_TaskHandle);
+    #endif
     vTaskResume(Hello_TaskHandle);
+    #ifndef DEBUG_NO_USE_RECEIVE_DATA
     vTaskResume(ReceiveData_TaskHandle);
+    #endif
     vTaskResume(SendData_TaskHandle);
+    #ifndef DEBUG_NO_USE_ROUTE_MANAGER
     vTaskResume(RoutingTableManager_TaskHandle);
+    #endif
+    #ifndef DEBUG_NO_USE_QUEUE_MANAGER
     vTaskResume(QueueManager_TaskHandle);
+    #endif
 
     // Start Receiving
     startReceiving();
@@ -74,12 +95,20 @@ void LoraMesher::start() {
 }
 
 LoraMesher::~LoraMesher() {
+    #ifndef DEBUG_NO_USE_RECEIVE_PACKET
     vTaskDelete(ReceivePacket_TaskHandle);
+    #endif
     vTaskDelete(Hello_TaskHandle);
+    #ifndef DEBUG_NO_USE_RECEIVE_DATA
     vTaskDelete(ReceiveData_TaskHandle);
+    #endif
     vTaskDelete(SendData_TaskHandle);
+    #ifndef DEBUG_NO_USE_ROUTE_MANAGER
     vTaskDelete(RoutingTableManager_TaskHandle);
+    #endif
+    #ifndef DEBUG_NO_USE_QUEUE_MANAGER
     vTaskDelete(QueueManager_TaskHandle);
+    #endif
 
     ToSendPackets->Clear();
     delete ToSendPackets;
@@ -318,20 +347,23 @@ int LoraMesher::startChannelScan() {
 
 void LoraMesher::initializeSchedulers() {
     ESP_LOGV(LM_TAG, "Setting up Schedulers");
-    int res = xTaskCreate(
+    int res;
+    #ifndef DEBUG_NO_USE_RECEIVE_PACKET
+    res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        1024,
+        4096,
         this,
         6,
         &ReceivePacket_TaskHandle);
     if (res != pdPASS) {
         ESP_LOGE(LM_TAG, "Receiving routine creation gave error: %d", res);
     }
+    #endif
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendPackets(); },
         "Sending routine",
-        1024,
+        256,
         this,
         5,
         &SendData_TaskHandle);
@@ -341,33 +373,38 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendHelloPacketRoutine(); },
         "Hello routine",
-        1024,
+        256,
         this,
         4,
         &Hello_TaskHandle);
     if (res != pdPASS) {
         ESP_LOGE(LM_TAG, "Process Task Hello creation gave error: %d", res);
     }
+    #ifndef DEBUG_NO_USE_RECEIVE_DATA
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->processPackets(); },
         "Process routine",
-        2048,
+        4096,
         this,
         3,
         &ReceiveData_TaskHandle);
     if (res != pdPASS) {
         ESP_LOGE(LM_TAG, "Process Task RxDat creation gave error: %d", res);
     }
+    #endif
+    #ifndef DEBUG_NO_USE_ROUTE_MANAGER
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->routingTableManager(); },
         "Routing Table Manager routine",
-        1024,
+        4096,
         this,
         2,
         &RoutingTableManager_TaskHandle);
     if (res != pdPASS) {
         ESP_LOGE(LM_TAG, "Routing Table Manager Task creation gave error: %d", res);
     }
+    #endif
+    #ifndef DEBUG_NO_USE_QUEUE_MANAGER
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->queueManager(); },
         "Queue Manager routine",
@@ -378,6 +415,7 @@ void LoraMesher::initializeSchedulers() {
     if (res != pdPASS) {
         ESP_LOGE(LM_TAG, "Queue Manager Task creation gave error: %d", res);
     }
+    #endif
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
 }
@@ -386,6 +424,8 @@ void LoraMesher::initializeSchedulers() {
 ICACHE_RAM_ATTR
 #endif
 void LoraMesher::onReceive(void) {
+
+    #ifndef DEBUG_NO_USE_RECEIVE_PACKET
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     xHigherPriorityTaskWoken = xTaskNotifyFromISR(
@@ -395,15 +435,15 @@ void LoraMesher::onReceive(void) {
         &xHigherPriorityTaskWoken);
 
     if (xHigherPriorityTaskWoken == pdTRUE) {
-#if defined(ESP32)
+        #if defined(ESP32)
         portYIELD_FROM_ISR();
-#elif defined(STM32)
+        #elif defined(STM32)
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-#else
+        #else
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-#endif
-
+        #endif
     }
+    #endif
 }
 
 void LoraMesher::receivingRoutine() {
@@ -469,11 +509,13 @@ void LoraMesher::receivingRoutine() {
                     ReceivedPackets->Append(pq);
 
                     //Notify that a packet needs to be process
+                    #ifndef DEBUG_NO_USE_RECEIVE_DATA
                     TWres = xTaskNotifyFromISR(
                         ReceiveData_TaskHandle,
                         0,
                         eSetValueWithoutOverwrite,
                         &TWres);
+                    #endif
                 }
             }
 
@@ -1203,7 +1245,9 @@ void LoraMesher::addToSendOrderedAndNotify(QueuePacket<Packet<uint8_t>>* qp) {
 
 void LoraMesher::notifyNewSequenceStarted() {
     //Notify the sendData task handle
+    #ifndef DEBUG_NO_USE_QUEUE_MANAGER
     xTaskNotify(QueueManager_TaskHandle, 0, eSetValueWithOverwrite);
+    #endif
 }
 
 /**
