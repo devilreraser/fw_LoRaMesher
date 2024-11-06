@@ -20,12 +20,15 @@
 
 #define USE_AS_CONCENTRATOR   1       /* 0:endpoint 1:concentrator */
 
+/* Comment/Comment out Following */
+//#define DEBUG_USE_BLINK_TASK
+
 //priority higher to lower
 #define USE_SBC_NodeMCU_ESP32       1
 #define USE_CS_1274                 1
 
 #if defined(STM32)
-
+#define USE_RED_LED_SEEED_GROVE_LORA_E5
 #elif USE_SBC_NodeMCU_ESP32
 //Using SBC-NodeMCU-ESP32
 #define RGB_RED     26     
@@ -52,6 +55,13 @@
 
 
 uint16_t id_concentrator = BROADCAST_ADDR;
+
+#define USE_BOARDS_DYNAMIC_STATISTICS   1
+#define BOARDS_DYNAMIC_COUNT_MAX        10
+uint16_t boards_dynamic_count = 0;
+uint16_t boards_dynamic_id_list[BOARDS_DYNAMIC_COUNT_MAX] = {0};
+uint16_t boards_dynamic_id_mess[BOARDS_DYNAMIC_COUNT_MAX] = {0};
+
 
 uint16_t id_list[] = 
 {
@@ -256,8 +266,8 @@ bool CircularQueue_Dequeue(CircularQueue *queue, void **item) {
 
 
 
-#define BUFFER_SIZE 192
-#define QUEUE_LENGTH 40
+#define BUFFER_SIZE 1024
+#define QUEUE_LENGTH 96
 
 static QueueHandle_t serialQueue = NULL;
 static SemaphoreHandle_t serialSemaphore = NULL;
@@ -271,6 +281,10 @@ static uint32_t u32PrintfReceiveEventFlag = 0;
 static uint32_t u32SkippedPrintfCirMalloc = 0;
 static uint32_t u32SkippedPrintfCirMallocBytes = 0;
 static uint32_t u32SkippedCircleQueueSend = 0;
+static uint32_t u32SkippedPrintfMemMallocFromCircle = 0;
+static uint32_t u32SkippedPrintfMemMallocBytesFromCircle = 0;
+static uint32_t u32SkippedSerialQueueSendFromCircle = 0;
+
 
 extern "C" int _write(int file, char *ptr, int len) {
     // Ensure the length does not exceed BUFFER_SIZE
@@ -329,8 +343,8 @@ extern "C" int _write(int file, char *ptr, int len) {
                 char* bufferCopyNew = (char *)pvPortMalloc(copyLenLoop + 1); 
                 if (bufferCopyNew == NULL) {
                     // Handle memory allocation failure
-                    u32SkippedPrintfMemMalloc++;
-                    u32SkippedPrintfMemMallocBytes += len;
+                    u32SkippedPrintfMemMallocFromCircle++;
+                    u32SkippedPrintfMemMallocBytesFromCircle += len;
                     circular_free(&buffer_uart_printf, bufferCopyOld);
                     
                 }
@@ -340,7 +354,7 @@ extern "C" int _write(int file, char *ptr, int len) {
                     bufferCopyNew[copyLenLoop] = '\0';
                     circular_free(&buffer_uart_printf, bufferCopyOld);
                     if (xQueueSend(serialQueue, &bufferCopyNew, SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS) != pdPASS) {
-                        u32SkippedSerialQueueSend++;
+                        u32SkippedSerialQueueSendFromCircle++;
                         vPortFree(bufferCopyNew);  // Free the buffer
                     }
                 }
@@ -414,6 +428,7 @@ void serialTask(void *pvParameters) {
 
 
 
+#ifdef DEBUG_USE_BLINK_TASK
 void blinkTask(void *pvParameters) {
     const int ledPin = LED_BUILTIN;
 
@@ -440,6 +455,7 @@ void blinkTask(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+#endif
 
 
 
@@ -465,6 +481,132 @@ void led_Flash(uint16_t flashes, uint16_t delaymS) {
     }
 }
 #endif
+
+
+
+
+
+
+#ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
+
+typedef enum 
+{
+    CODE_IDLE,
+    CODE_RX_MESSAGE,    //1 fast blink
+    CODE_TX_MESSAGE,    //1 slow blink
+//    CODE_INIT_START,    //2 fast blinks
+//    CODE_INIT_FINAL,    //3 fast blinks
+}e_LoRaE5IndicationCode;
+
+TaskHandle_t ledLoRaE5Indication_Handle = NULL;
+QueueHandle_t uint16LedLoRaE5IndicationQueue = NULL;
+
+void processLedLoRaE5Indication(void*) {
+    const int ledPin = LED_BUILTIN;
+    const int ledOn  = 0;
+    const int ledOff = 1;
+
+    pinMode(ledPin, OUTPUT);
+    digitalWrite(ledPin, ledOff);
+
+    for (;;) {
+        uint16_t code =0b000;
+        if (xQueueReceive(uint16LedLoRaE5IndicationQueue, &code, pdMS_TO_TICKS(100)) == pdPASS) {
+            ESP_LOGV(TAG, "Data received from Led LoRa E5 Indication queue: %X", code);
+
+            ESP_LOGV("main", "Stack space unused after entering the task processLedLoRaE5Indication: %d", uxTaskGetStackHighWaterMark(NULL));
+            ESP_LOGV("main", "Free heap: %d", getFreeHeap());
+
+            switch(code)
+            {
+                case CODE_RX_MESSAGE:
+                    digitalWrite(ledPin, ledOn);
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                    digitalWrite(ledPin, ledOff);
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    break;
+
+                case CODE_TX_MESSAGE:
+                    digitalWrite(ledPin, ledOn);
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    digitalWrite(ledPin, ledOff);
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    break;
+
+                // case CODE_INIT_START:
+                //     digitalWrite(ledPin, ledOn);
+                //     vTaskDelay(100 / portTICK_PERIOD_MS);
+                //     digitalWrite(ledPin, ledOff);
+                //     vTaskDelay(100 / portTICK_PERIOD_MS);
+                //     digitalWrite(ledPin, ledOn);
+                //     vTaskDelay(100 / portTICK_PERIOD_MS);
+                //     digitalWrite(ledPin, ledOff);
+                //     vTaskDelay(2000 / portTICK_PERIOD_MS);
+                //     break;
+
+                default:
+                    //vTaskDelay(100 / portTICK_PERIOD_MS);
+                    break;
+            }
+
+            //vTaskDelay(1000 / portTICK_PERIOD_MS);
+            
+        } else {
+            //printf("No data received.\r\n");
+        }
+
+
+    }
+    
+}
+void createLedLoRaE5Indication() {
+    int res = xTaskCreate(
+        processLedLoRaE5Indication,
+        "Led LoRa E5 Indication Task",
+        256,
+        (void*) 1,
+        2,
+        &ledLoRaE5Indication_Handle);
+    if (res != pdPASS) {
+        printf("Error: Led LoRa E5 Indication Task creation gave error: %d\r\n", res);
+    }
+}
+
+void sendLedLoRaE5Indication(e_LoRaE5IndicationCode code)
+{
+    uint16_t led_code = code;
+    if (xQueueSend(uint16LedLoRaE5IndicationQueue, &led_code, pdMS_TO_TICKS(0)) == pdPASS) {
+        ESP_LOGV(TAG, "Data sent to queue Led LoRa E5 Indication. %X", led_code);
+    } else {
+        ESP_LOGE(TAG, "Failed to send data to queue Led LoRa E5 Indication.");
+    }
+}
+
+void initLedLoRaE5Indication(void)
+{
+    uint16LedLoRaE5IndicationQueue = xQueueCreate(10, sizeof(uint16_t));
+    if (uint16LedLoRaE5IndicationQueue == nullptr) {
+        ESP_LOGE(TAG, "Failed to create queue Led LoRa E5 Indication.");
+    } else {
+        ESP_LOGV(TAG, "Queue Led LoRa E5 Indication created successfully.");
+        //sendLedLoRaE5Indication(CODE_INIT_START);
+    }
+    createLedLoRaE5Indication();
+}
+
+
+#endif  /* #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5 */
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -534,6 +676,31 @@ void printMessageCounts() {
     printf("|  %04X  |  %04X  |  %04X  |  %04X  |  %04X  |\r\n", id_list[0], id_list[1], id_list[2], id_list[3], id_spare);
     printf("|  %04d  |  %04d  |  %04d  |  %04d  |  %04d  |\r\n", messages[0], messages[1], messages[2], messages[3], messages_spare);
     printf("----------------------------------------------\r\n");
+}
+void printDynamicMessageCounts() {
+    uint16_t id_spare = 0;
+    uint16_t messages_spare = 0;
+    char print_line_dash[256] = {0};
+    char print_line_idnt[256] = {0};
+    char print_line_mess[256] = {0};
+
+
+    for (int index = 0; index < boards_dynamic_count; index++)
+    {
+        sprintf(&print_line_dash[strlen(print_line_dash)], "---------");
+        sprintf(&print_line_idnt[strlen(print_line_idnt)], "|  %04X  ", boards_dynamic_id_list[index]);
+        sprintf(&print_line_mess[strlen(print_line_mess)], "|  %04d  ", boards_dynamic_id_mess[index]);
+    }
+    sprintf(&print_line_dash[strlen(print_line_dash)], "-\r\n");
+    sprintf(&print_line_idnt[strlen(print_line_idnt)], "|\r\n");
+    sprintf(&print_line_mess[strlen(print_line_mess)], "|\r\n");
+
+    // printf("%s", print_line_dash);
+    // printf("%s", print_line_idnt);
+    // printf("%s", print_line_mess);
+    // printf("%s", print_line_dash);
+    printf("%s%s%s%s", print_line_dash, print_line_idnt, print_line_mess, print_line_dash);
+
 }
 /**
  * @brief Function that process the received packets
@@ -638,6 +805,35 @@ void processReceivedPackets(void*) {
                             break;
                         }
                     }
+
+                    int board_index = BOARDS_DYNAMIC_COUNT_MAX;
+                    for (int i = 0; i < boards_dynamic_count; i++)
+                    {
+                        if (packet_sender == boards_dynamic_id_list[i])
+                        {
+                            boards_dynamic_id_mess[i]++;
+                            board_index = i;
+                            break;
+                        }
+                    }
+                    if (board_index >= BOARDS_DYNAMIC_COUNT_MAX)
+                    {
+                        if (boards_dynamic_count < BOARDS_DYNAMIC_COUNT_MAX)
+                        {
+                            board_index = boards_dynamic_count;
+                            boards_dynamic_count++;
+                            boards_dynamic_id_mess[board_index]++;
+                            boards_dynamic_id_list[board_index] = packet_sender;
+                        }
+                    }
+
+
+
+
+                    #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
+                    sendLedLoRaE5Indication(CODE_RX_MESSAGE);
+                    #endif
+
                     #ifdef RGB_RED
                     if (xQueueSend(uint16LedRGBQueue, &rgb_code, pdMS_TO_TICKS(0)) == pdPASS) {
                         ESP_LOGV(TAG, "Data sent to queue. %X", rgb_code);
@@ -654,7 +850,11 @@ void processReceivedPackets(void*) {
             radio.deletePacket(packet);
         }
         // Print message counts for each ID
+        #if USE_BOARDS_DYNAMIC_STATISTICS 
+        printDynamicMessageCounts();
+        #else
         printMessageCounts();
+        #endif
     }
 }
 
@@ -788,7 +988,7 @@ TaskHandle_t ledSendIndcation_Handle = NULL;
 void createLedSendIndication() {
     int res = xTaskCreate(
         processLedSendIndcation,
-        "Receive App Task",
+        "Led Send Indication Task",
         4096,
         (void*) 1,
         2,
@@ -798,6 +998,9 @@ void createLedSendIndication() {
     }
 }
 #endif
+
+
+
 
 
 /**
@@ -897,7 +1100,15 @@ void setupLoraMesher() {
 void MesherTask(void *pvParameters) {
     // This replaces the `loop()` function with main Mesher Function
 
+    #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
+    //sendLedLoRaE5Indication(CODE_INIT_START);
+    #endif
+
     setupLoraMesher();
+
+    #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
+    //sendLedLoRaE5Indication(CODE_INIT_FINAL);
+    #endif
 
     helloPacket->id_sender = radio.getLocalAddress();
 
@@ -906,6 +1117,11 @@ void MesherTask(void *pvParameters) {
     printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
     printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
     for (;;) {
+
+        ESP_LOGV("main", "Stack space unused after entering the task MesherTask: %d", uxTaskGetStackHighWaterMark(NULL));
+        ESP_LOGV("main", "Free heap: %d", getFreeHeap());
+
+
         if (concentrator)
         {
             ESP_LOGV(TAG, "Send packet %d\r\n", dataCounter);
@@ -914,6 +1130,9 @@ void MesherTask(void *pvParameters) {
 
             //Create packet and send it.
             radio.createPacketAndSend(BROADCAST_ADDR, helloPacket, 1);
+            #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
+            sendLedLoRaE5Indication(CODE_TX_MESSAGE);
+            #endif
             #ifdef BOARD_LED
             uint16_t code = 0b1;  //on
             if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
@@ -941,6 +1160,9 @@ void MesherTask(void *pvParameters) {
 
                 //Create packet and send it.
                 radio.createPacketAndSend(id_concentrator, helloPacket, 1);
+                #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
+                sendLedLoRaE5Indication(CODE_TX_MESSAGE);
+                #endif
                 #ifdef BOARD_LED
                 uint16_t code = 0b1;  //on
                 if (xQueueSend(uint16LedQueue, &code, pdMS_TO_TICKS(0)) == pdPASS) {
@@ -959,6 +1181,7 @@ void MesherTask(void *pvParameters) {
 
         printRoutingTable();
 #if 0
+#endif
         ESP_LOGV(TAG, "routingTableSize                 %d", radio.routingTableSize());
         ESP_LOGV(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
         ESP_LOGV(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
@@ -975,16 +1198,21 @@ void MesherTask(void *pvParameters) {
         ESP_LOGV(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
         ESP_LOGV(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
         ESP_LOGV(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
-#endif
+        ESP_LOGV(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
+        ESP_LOGV(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
+        ESP_LOGV(TAG, "------------------------------------");
         ESP_LOGV(TAG, "getOnReceiveEventsCounter        %d", radio.getOnReceiveEventsCounter());
         ESP_LOGV(TAG, "u32SkippedPrintfMemMalloc        %d", u32SkippedPrintfMemMalloc);
         ESP_LOGV(TAG, "u32SkippedPrintfMemMallocBytes   %d", u32SkippedPrintfMemMallocBytes);
         ESP_LOGV(TAG, "u32SkippedSerialQueueNull        %d", u32SkippedSerialQueueNull);
         ESP_LOGV(TAG, "u32SkippedSerialQueueSend        %d", u32SkippedSerialQueueSend);
-        ESP_LOGV(TAG, "u32SkippedPrintfEventFlag        %d", u32PrintfReceiveEventFlag);
+        ESP_LOGV(TAG, "u32PrintfReceiveEventFlag        %d", u32PrintfReceiveEventFlag);
         ESP_LOGV(TAG, "u32SkippedPrintfCirMalloc        %d", u32SkippedPrintfCirMalloc);
         ESP_LOGV(TAG, "u32SkippedPrintfCirMallocBytes   %d", u32SkippedPrintfCirMallocBytes);
         ESP_LOGV(TAG, "u32SkippedCircleQueueSend        %d", u32SkippedCircleQueueSend);
+        ESP_LOGV(TAG, "u32SkippedPrintfMemMallocFromCircle        %d", u32SkippedPrintfMemMallocFromCircle);
+        ESP_LOGV(TAG, "u32SkippedPrintfMemMallocBytesFromCircle   %d", u32SkippedPrintfMemMallocBytesFromCircle);
+        ESP_LOGV(TAG, "u32SkippedSerialQueueSendFromCircle        %d", u32SkippedSerialQueueSendFromCircle);
 
 
         #if USE_AS_CONCENTRATOR
@@ -1028,10 +1256,12 @@ void setup() {
     }
 
     //Create task for LED blinking handling
+    #ifdef DEBUG_USE_BLINK_TASK
     res = xTaskCreate(blinkTask, "Blink Task", 128, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "Blink Task creation gave error: %d", res);
     }
+    #endif
 
     printf("initBoard \r\n");
     ESP_LOGI("main", "configMINIMAL_STACK_SIZE: %d", configMINIMAL_STACK_SIZE);
@@ -1121,6 +1351,9 @@ void setup() {
     }
 #endif
 
+    #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
+    initLedLoRaE5Indication();
+    #endif
 
     // Create task for printf -> Serial handling
     res = xTaskCreate(MesherTask,"MesherTask",1024, NULL, 1, NULL);
