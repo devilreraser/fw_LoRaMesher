@@ -5,10 +5,11 @@
 #endif
 
 /* Section below For Task Debugging - Comment out for normal operation */
-#define DEBUG_NO_USE_QUEUE_MANAGER
-#define DEBUG_NO_USE_ROUTE_MANAGER
-#define DEBUG_NO_USE_RECEIVE_DATA
-#define DEBUG_NO_USE_RECEIVE_PACKET
+//#define DEBUG_NO_USE_QUEUE_MANAGER
+//#define DEBUG_NO_USE_ROUTE_MANAGER
+//#define DEBUG_NO_USE_RECEIVE_DATA
+//#define DEBUG_NO_USE_RECEIVE_PACKET
+//#define DEBUG_NO_USE_RECEIVE_PACKET_NOTIFY_RECEIVE_DATA
 
 LoraMesher::LoraMesher() {}
 
@@ -384,7 +385,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->processPackets(); },
         "Process routine",
-        4096,
+        1024,
         this,
         3,
         &ReceiveData_TaskHandle);
@@ -396,7 +397,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->routingTableManager(); },
         "Routing Table Manager routine",
-        4096,
+        1024,
         this,
         2,
         &RoutingTableManager_TaskHandle);
@@ -408,7 +409,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->queueManager(); },
         "Queue Manager routine",
-        2048,
+        1024,
         this,
         2,
         &QueueManager_TaskHandle);
@@ -424,26 +425,33 @@ void LoraMesher::initializeSchedulers() {
 ICACHE_RAM_ATTR
 #endif
 void LoraMesher::onReceive(void) {
+    LoraMesher::getInstance().setOnReceiveEventsFlag();
+    LoraMesher::getInstance().incOnReceiveEventsCounter();
+    ESP_LOGI(LM_TAG, "LoraMesher::onReceive");
+    printf("onReceive\r\n");
 
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    #ifndef DEBUG_NO_USE_RECEIVE_PACKET_NOTIFY_RECEIVE_DATA
 
+    #if defined(ESP32)    
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xHigherPriorityTaskWoken = xTaskNotifyFromISR(
         LoraMesher::getInstance().ReceivePacket_TaskHandle,
         0,
         eSetValueWithoutOverwrite,
         &xHigherPriorityTaskWoken);
-
-    if (xHigherPriorityTaskWoken == pdTRUE) {
-        #if defined(ESP32)
-        portYIELD_FROM_ISR();
-        #elif defined(STM32)
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-        #else
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-        #endif
-    }
+    portYIELD_FROM_ISR();
+    #else
+    to do: task notify fix with bool
+    xTaskNotify(
+        LoraMesher::getInstance().ReceivePacket_TaskHandle,
+        0,
+        eSetValueWithoutOverwrite);
     #endif
+
+    #endif
+    #endif
+    LoraMesher::getInstance().clrOnReceiveEventsFlag();
 }
 
 void LoraMesher::receivingRoutine() {

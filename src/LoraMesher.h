@@ -447,6 +447,20 @@ public:
     uint32_t getSentControlBytes() { return sentControlBytes; }
 
     /**
+     * @brief Get onReceiveEventsCounter
+     *
+     * @return uint32_t
+     */
+    uint32_t getOnReceiveEventsCounter() { return onReceiveEventsCounter; }
+
+    /**
+     * @brief Get onReceiveEventsFlag
+     *
+     * @return uint32_t
+     */
+    uint32_t getOnReceiveEventsFlag() { return onReceiveEventsFlag; }
+
+    /**
      * @brief Defines that the node is a gateway. WARNING: Changing the role frequently can cause problems in the network.
      *
      */
@@ -503,6 +517,7 @@ public:
 #ifndef LM_GOD_MODE
 private:
 #endif
+
 
     /**
      * @brief Construct a new LoraMesher object
@@ -659,6 +674,13 @@ private:
 
     uint32_t receivedRoutingTablePacketsNum = 0;
     void incReceivedRoutingTablePackets() { receivedRoutingTablePacketsNum++; }
+
+    uint32_t onReceiveEventsCounter = 0;
+    void incOnReceiveEventsCounter() { onReceiveEventsCounter++; }
+
+    bool onReceiveEventsFlag = 0;
+    void setOnReceiveEventsFlag() { onReceiveEventsFlag = 1; }
+    void clrOnReceiveEventsFlag() { onReceiveEventsFlag = 0; }
 
     /**
      * @brief Function that process the packets inside Received Packets
