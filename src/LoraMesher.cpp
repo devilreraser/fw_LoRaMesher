@@ -10,6 +10,12 @@
 //#define DEBUG_NO_USE_RECEIVE_DATA
 //#define DEBUG_NO_USE_RECEIVE_PACKET
 //#define DEBUG_NO_USE_RECEIVE_PACKET_NOTIFY_RECEIVE_DATA
+#define ON_RECEIVE_NOTIFY_WITH_BOOL
+
+
+#ifdef ON_RECEIVE_NOTIFY_WITH_BOOL
+bool b_on_receive_notify = false;
+#endif
 
 LoraMesher::LoraMesher() {}
 
@@ -349,6 +355,20 @@ int LoraMesher::startChannelScan() {
 void LoraMesher::initializeSchedulers() {
     ESP_LOGV(LM_TAG, "Setting up Schedulers");
     int res;
+
+    #ifdef ON_RECEIVE_NOTIFY_WITH_BOOL
+    res = xTaskCreate(
+        [](void* o) { static_cast<LoraMesher*>(o)->helperRoutine(); },
+        "Helper routine",
+        256,
+        this,
+        6,
+        &Helper_TaskHandle);
+    if (res != pdPASS) {
+        ESP_LOGE(LM_TAG, "Helper routine creation gave error: %d", res);
+    }
+    #endif
+    
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
@@ -442,17 +462,63 @@ void LoraMesher::onReceive(void) {
         &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR();
     #else
-    to do: task notify fix with bool
-    xTaskNotify(
+    
+    #ifdef ON_RECEIVE_NOTIFY_WITH_BOOL
+    b_on_receive_notify = true;
+    #else
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xHigherPriorityTaskWoken = xTaskNotifyFromISR(
         LoraMesher::getInstance().ReceivePacket_TaskHandle,
         0,
-        eSetValueWithoutOverwrite);
+        eSetValueWithoutOverwrite,
+        &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    #endif
     #endif
 
     #endif
     #endif
     LoraMesher::getInstance().clrOnReceiveEventsFlag();
 }
+
+#ifdef ON_RECEIVE_NOTIFY_WITH_BOOL
+void LoraMesher::helperRoutine() {
+    ESP_LOGV(LM_TAG, "Helper routine started");
+    //vTaskSuspend(NULL);
+
+    int task_delay_ms = 10;
+    int print_delay_ms = 5000;
+    int print_timeout_ms = print_delay_ms;
+    
+
+    for (;;) {
+
+        if (b_on_receive_notify)
+        {
+            incHelperOnReceiveTriggerNum();
+            b_on_receive_notify = false;
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xHigherPriorityTaskWoken = xTaskNotifyFromISR(
+                LoraMesher::getInstance().ReceivePacket_TaskHandle,
+                0,
+                eSetValueWithoutOverwrite,
+                &xHigherPriorityTaskWoken);
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+            
+        }
+
+        if (print_timeout_ms >= print_delay_ms)
+        {
+            print_timeout_ms = 0;
+            ESP_LOGV(LM_TAG, "Stack space unused after entering the task helperRoutine: %d", uxTaskGetStackHighWaterMark(NULL));
+            ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
+        }
+        print_timeout_ms += task_delay_ms;
+        //Set a random delay, to avoid some collisions.
+        vTaskDelay(pdMS_TO_TICKS(task_delay_ms));
+    }
+}
+#endif
 
 void LoraMesher::receivingRoutine() {
     ESP_LOGV(LM_TAG, "Receiving routine started");
@@ -469,12 +535,15 @@ void LoraMesher::receivingRoutine() {
             pdFALSE,
             NULL,
             portMAX_DELAY);
-
+        
         if (TWres == pdPASS) {
             ESP_LOGV(LM_TAG, "Stack space unused after entering the task receivingRoutine: %d", uxTaskGetStackHighWaterMark(NULL));
             ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
             hasReceivedMessage = true;
+
+            incReceivedTotalPackets();
+
 
             packetSize = radio->getPacketLength();
             if (packetSize == 0)

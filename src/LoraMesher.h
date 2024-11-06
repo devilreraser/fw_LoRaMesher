@@ -454,6 +454,20 @@ public:
     uint32_t getOnReceiveEventsCounter() { return onReceiveEventsCounter; }
 
     /**
+     * @brief Get receivedTotalPacketsNum
+     *
+     * @return uint32_t
+     */
+    uint32_t getReceivedTotalPacketsNum() { return receivedTotalPacketsNum; }
+
+    /**
+     * @brief Get helperOnReceiveTriggerNum
+     *
+     * @return uint32_t
+     */
+    uint32_t getHelperOnReceiveTriggerNum() { return helperOnReceiveTriggerNum; }
+
+    /**
      * @brief Get onReceiveEventsFlag
      *
      * @return uint32_t
@@ -550,6 +564,12 @@ private:
     TaskHandle_t Hello_TaskHandle = nullptr;
 
     /**
+     * @brief Helper task handle.
+     *
+     */
+    TaskHandle_t Helper_TaskHandle = nullptr;
+
+    /**
      * @brief Receive packets task handle. Every time a LoRa packet is detected it will create a packet,
      *  store it into the received packets queue and notify the receive data task handle
      *
@@ -608,6 +628,8 @@ private:
     void channelScan();
 
     int startChannelScan();
+
+    void helperRoutine();
 
     void receivingRoutine();
 
@@ -681,6 +703,12 @@ private:
     bool onReceiveEventsFlag = 0;
     void setOnReceiveEventsFlag() { onReceiveEventsFlag = 1; }
     void clrOnReceiveEventsFlag() { onReceiveEventsFlag = 0; }
+
+    uint32_t receivedTotalPacketsNum = 0;
+    void incReceivedTotalPackets() { receivedTotalPacketsNum++; }
+
+    uint32_t helperOnReceiveTriggerNum = 0;
+    void incHelperOnReceiveTriggerNum() { helperOnReceiveTriggerNum++; }
 
     /**
      * @brief Function that process the packets inside Received Packets
