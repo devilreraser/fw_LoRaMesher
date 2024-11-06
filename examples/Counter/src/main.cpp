@@ -12,7 +12,7 @@
 #endif
 
 /* Section below For Task Debugging - Comment out for normal operation */
-#define DEBUG_NO_USE_RECEIVED_APP_MESSAGES      
+//#define DEBUG_NO_USE_RECEIVED_APP_MESSAGES      
 
 #include <vector>
 
@@ -108,43 +108,260 @@ const size_t maxBroadcastPayloads = 16;
 
 
 
+/* circular buffer begin */
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+
+#define CIRCULAR_BUFFER_SIZE 4096  // Define the total buffer size
+
+typedef struct {
+    char data[CIRCULAR_BUFFER_SIZE];  // Fixed circular buffer
+    int head;                // Write position
+    int tail;                // Read/free position
+    int count;               // Used bytes in buffer
+} CircularMallocBuffer;
+
+typedef struct {
+    int size;                // Size of the allocated block
+    bool in_use;             // Status of the block
+} BlockHeader;
+
+static CircularMallocBuffer buffer_uart_printf;
+
+void initBuffer(CircularMallocBuffer* buffer) {
+    buffer->head = 0;
+    buffer->tail = 0;
+    buffer->count = 0;
+}
+
+void* circular_malloc(CircularMallocBuffer* buffer, int size) {
+    if (size <= 0 || size + sizeof(BlockHeader) > CIRCULAR_BUFFER_SIZE) {
+        return NULL;  // Invalid size or too large for buffer
+    }
+
+    int totalSize = size + sizeof(BlockHeader);  // BlockHeader + data
+    if (buffer->count + totalSize > CIRCULAR_BUFFER_SIZE) {
+        return NULL;  // Not enough space
+    }
+
+    // Wrap head if needed
+    if (buffer->head + totalSize > CIRCULAR_BUFFER_SIZE) {
+        if (buffer->tail > totalSize) {
+            buffer->head = 0;
+        } else {
+            return NULL;  // Can't wrap, not enough space
+        }
+    }
+
+    // Initialize the block header at the head
+    BlockHeader* header = (BlockHeader*)&buffer->data[buffer->head];
+    header->size = size;
+    header->in_use = true;
+
+    // Calculate the location of the user data
+    void* dataPtr = (void*)((uint8_t*)header + sizeof(BlockHeader));
+
+    // Update the head and count
+    buffer->head = (buffer->head + totalSize) % CIRCULAR_BUFFER_SIZE;
+    buffer->count += totalSize;
+
+    return dataPtr;
+}
+
+void circular_free(CircularMallocBuffer* buffer, void* ptr) {
+    if (ptr == NULL) {
+        return;
+    }
+
+    // Get the block header for the given pointer
+    BlockHeader* header = (BlockHeader*)((uint8_t*)ptr - sizeof(BlockHeader));
+
+    if (header->in_use) {
+        // Mark the block as free
+        header->in_use = false;
+        buffer->count -= (header->size + sizeof(BlockHeader));
+
+        // Move tail forward if this block is the current tail
+        while (buffer->count > 0) {
+            BlockHeader* currentHeader = (BlockHeader*)&buffer->data[buffer->tail];
+            if (currentHeader->in_use) {
+                break;
+            }
+            buffer->tail = (buffer->tail + currentHeader->size + sizeof(BlockHeader)) % CIRCULAR_BUFFER_SIZE;
+        }
+    }
+}
+/* circular buffer final */
+
+
+
+
+/* circular queue start */
+
+#define CIRCULAR_QUEUE_SIZE 16  // Define the maximum number of pointers in the queue
+
+typedef struct {
+    void *data[CIRCULAR_QUEUE_SIZE];  // Array to hold pointers
+    int head;                         // Index of the next element to dequeue
+    int tail;                         // Index where the next element will be enqueued
+    int count;                        // Number of items currently in the queue
+} CircularQueue;
+
+CircularQueue circularQueue;
+
+// Initialize the queue
+void CircularQueue_Init(CircularQueue *queue) {
+    queue->head = 0;
+    queue->tail = 0;
+    queue->count = 0;
+}
+
+// Check if the queue is full
+bool CircularQueue_IsFull(CircularQueue *queue) {
+    return queue->count == CIRCULAR_QUEUE_SIZE;
+}
+
+// Check if the queue is empty
+bool CircularQueue_IsEmpty(CircularQueue *queue) {
+    return queue->count == 0;
+}
+
+// Enqueue an item (pointer) into the queue
+bool CircularQueue_Enqueue(CircularQueue *queue, void *item) {
+    if (CircularQueue_IsFull(queue)) {
+        // Handle overflow if needed, e.g., return false or discard oldest item
+        return false;
+    }
+
+    queue->data[queue->tail] = item;
+    queue->tail = (queue->tail + 1) % CIRCULAR_QUEUE_SIZE;
+    queue->count++;
+    return true;
+}
+
+// Dequeue an item (pointer) from the queue
+bool CircularQueue_Dequeue(CircularQueue *queue, void **item) {
+    if (CircularQueue_IsEmpty(queue)) {
+        return false;  // No item to dequeue
+    }
+
+    *item = queue->data[queue->head];
+    queue->head = (queue->head + 1) % CIRCULAR_QUEUE_SIZE;
+    queue->count--;
+    return true;
+}
+/* circular queue final */
+
 
 
 
 #define BUFFER_SIZE 192
-#define QUEUE_LENGTH 32
+#define QUEUE_LENGTH 40
 
 static QueueHandle_t serialQueue = NULL;
 static SemaphoreHandle_t serialSemaphore = NULL;
 
+#define SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS pdMS_TO_TICKS(0)
+static uint32_t u32SkippedPrintfMemMalloc = 0;
+static uint32_t u32SkippedPrintfMemMallocBytes = 0;
+static uint32_t u32SkippedSerialQueueNull = 0;
+static uint32_t u32SkippedSerialQueueSend = 0;
+static uint32_t u32PrintfReceiveEventFlag = 0;
+static uint32_t u32SkippedPrintfCirMalloc = 0;
+static uint32_t u32SkippedPrintfCirMallocBytes = 0;
+static uint32_t u32SkippedCircleQueueSend = 0;
 
 extern "C" int _write(int file, char *ptr, int len) {
     // Ensure the length does not exceed BUFFER_SIZE
     int copyLen = (len < BUFFER_SIZE) ? len : BUFFER_SIZE;
 
-    // Allocate memory for the message
-    char *buffer = (char *)pvPortMalloc(copyLen + 1);
-    if (buffer == NULL) {
-        // Handle memory allocation failure
+    bool printOnReceiveFlag = false;
+
+    if (serialQueue == NULL) 
+    {
+        u32SkippedSerialQueueNull++;
         return -1;
+    }
+    if (radio.getOnReceiveEventsFlag())
+    {
+        u32PrintfReceiveEventFlag++;
+        //return -1;
+        printOnReceiveFlag = true;
+    }
+
+    // Allocate memory for the message
+    char *buffer = NULL;
+    if (printOnReceiveFlag == false)
+    {
+        buffer = (char *)pvPortMalloc(copyLen + 1); //this halts if from event onReceive
+        if (buffer == NULL) {
+            // Handle memory allocation failure
+            u32SkippedPrintfMemMalloc++;
+            u32SkippedPrintfMemMallocBytes += len;
+            return -1;
+        }
+    }
+    else
+    {
+        buffer = (char *)circular_malloc(&buffer_uart_printf, copyLen + 1);
+        if (buffer == NULL) {
+            // Handle memory allocation failure
+            u32SkippedPrintfCirMalloc++;
+            u32SkippedPrintfCirMallocBytes += len;
+            return -1;
+        }
     }
 
     // Copy data and null-terminate
     memcpy(buffer, ptr, copyLen);
     buffer[copyLen] = '\0';
 
-    if (serialQueue == NULL) 
+
+    if (printOnReceiveFlag == false)
     {
-        vPortFree(buffer);
-        return -1;
+        char *bufferCopyOld = NULL;
+        while(CircularQueue_Dequeue(&circularQueue, (void**)&bufferCopyOld) == pdPASS)
+        {
+            if (bufferCopyOld)
+            {
+                int copyLenLoop = strlen(bufferCopyOld);
+                char* bufferCopyNew = (char *)pvPortMalloc(copyLenLoop + 1); 
+                if (bufferCopyNew == NULL) {
+                    // Handle memory allocation failure
+                    u32SkippedPrintfMemMalloc++;
+                    u32SkippedPrintfMemMallocBytes += len;
+                    circular_free(&buffer_uart_printf, bufferCopyOld);
+                    
+                }
+                else
+                {
+                    memcpy(bufferCopyNew, bufferCopyOld, copyLenLoop);
+                    bufferCopyNew[copyLenLoop] = '\0';
+                    circular_free(&buffer_uart_printf, bufferCopyOld);
+                    if (xQueueSend(serialQueue, &bufferCopyNew, SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS) != pdPASS) {
+                        u32SkippedSerialQueueSend++;
+                        vPortFree(bufferCopyNew);  // Free the buffer
+                    }
+                }
+            }
+        }
+
+        if (xQueueSend(serialQueue, &buffer, SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS) != pdPASS) {
+            u32SkippedSerialQueueSend++;
+            vPortFree(buffer);  // Free the buffer
+            return -1;
+        }
+    }
+    else
+    {
+        if (CircularQueue_Enqueue(&circularQueue, buffer) != pdPASS) {
+            u32SkippedCircleQueueSend++;
+            circular_free(&buffer_uart_printf, buffer);  // Free the buffer
+            return -1;
+        }
     }
 
-    // Enqueue the buffer
-    if (xQueueSend(serialQueue, &buffer, portMAX_DELAY) != pdPASS) {
-        // Handle queue send failure
-        vPortFree(buffer);
-        return -1;
-    }
 
     return len;  // Return the number of characters written
 }
@@ -759,6 +976,16 @@ void MesherTask(void *pvParameters) {
         ESP_LOGV(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
         ESP_LOGV(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
 #endif
+        ESP_LOGV(TAG, "getOnReceiveEventsCounter        %d", radio.getOnReceiveEventsCounter());
+        ESP_LOGV(TAG, "u32SkippedPrintfMemMalloc        %d", u32SkippedPrintfMemMalloc);
+        ESP_LOGV(TAG, "u32SkippedPrintfMemMallocBytes   %d", u32SkippedPrintfMemMallocBytes);
+        ESP_LOGV(TAG, "u32SkippedSerialQueueNull        %d", u32SkippedSerialQueueNull);
+        ESP_LOGV(TAG, "u32SkippedSerialQueueSend        %d", u32SkippedSerialQueueSend);
+        ESP_LOGV(TAG, "u32SkippedPrintfEventFlag        %d", u32PrintfReceiveEventFlag);
+        ESP_LOGV(TAG, "u32SkippedPrintfCirMalloc        %d", u32SkippedPrintfCirMalloc);
+        ESP_LOGV(TAG, "u32SkippedPrintfCirMallocBytes   %d", u32SkippedPrintfCirMallocBytes);
+        ESP_LOGV(TAG, "u32SkippedCircleQueueSend        %d", u32SkippedCircleQueueSend);
+
 
         #if USE_AS_CONCENTRATOR
         //Wait 5 seconds to send the next packet
@@ -774,6 +1001,8 @@ void MesherTask(void *pvParameters) {
 
 void setup() {
 
+    initBuffer(&buffer_uart_printf);
+    CircularQueue_Init(&circularQueue);
     int res;
 
     Serial.begin(115200);
