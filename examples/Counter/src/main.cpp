@@ -18,7 +18,7 @@
 
 #define TAG "main"
 
-#define USE_AS_CONCENTRATOR   1       /* 0:endpoint 1:concentrator */
+#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
 
 /* Comment/Comment out Following */
 //#define DEBUG_USE_BLINK_TASK
