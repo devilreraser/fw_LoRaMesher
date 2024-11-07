@@ -2,6 +2,25 @@
 
 #ifdef ARDUINO
 #ifndef ESP32
+#include "stm32wlxx_hal.h"
+
+void GetUID(uint8_t *uidBuffer) {
+    uint32_t uidPart1 = *(uint32_t *)0x1FFF7580;  // First 32 bits
+    uint32_t uidPart2 = *(uint32_t *)0x1FFF7584;  // Second 32 bits
+    uint32_t uidPart3 = *(uint32_t *)0x1FFF7588;  // Third 32 bits
+
+    // Combine into a MAC-like structure
+    uidBuffer[5] = (uidPart1 >>  0) & 0xFF;
+    uidBuffer[4] = (uidPart1 >>  8) & 0xFF;
+    uidBuffer[3] = (uidPart1 >> 16) & 0xFF;
+    uidBuffer[2] = (uidPart1 >> 24) & 0xFF;
+    uidBuffer[1] = (uidPart2 >>  0) & 0xFF;
+    uidBuffer[0] = (uidPart2 >>  8) & 0xFF;
+
+    ESP_LOGI(LM_TAG, "UID @ 0x1FFF7580: 0x%08X", uidPart1);
+    ESP_LOGI(LM_TAG, "UID @ 0x1FFF7584: 0x%08X", uidPart2);
+    ESP_LOGI(LM_TAG, "UID @ 0x1FFF7588: 0x%08X", uidPart3);
+}
 
 #else
 #include "WiFi.h"
@@ -15,9 +34,7 @@ void WiFiService::init() {
     uint8_t mac[6];
 #ifdef ARDUINO
 #ifndef ESP32
-    long temp_mac = random();
-    mac[4] = temp_mac & 0xFF;
-    mac[5] = temp_mac >> 2 & 0xFF;
+    GetUID(mac);
 #else
     WiFi.macAddress(mac);
 #endif

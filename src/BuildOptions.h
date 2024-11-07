@@ -72,7 +72,7 @@ extern const char* LM_VERSION;
 #define LM_PREAMBLE_LENGTH 8U
 
 #if defined STM32
-#define LM_POWER 6
+#define LM_POWER 22 /* LoRa-E5 */
 #else
 #define LM_POWER 6
 #endif
