@@ -123,7 +123,7 @@ const size_t maxBroadcastPayloads = 16;
 #include <stdint.h>
 #include <string.h>
 
-#define CIRCULAR_BUFFER_SIZE 4096  // Define the total buffer size
+#define CIRCULAR_BUFFER_SIZE 2048  // Define the total buffer size
 
 typedef struct {
     char data[CIRCULAR_BUFFER_SIZE];  // Fixed circular buffer
@@ -1095,6 +1095,16 @@ void setupLoraMesher() {
     printf("Lora initialized\r\n");
 }
 
+void printSubGHzInterruptPriority() {
+    // Replace SUBGHZ_Radio_IRQn with the actual IRQ number for SubGHz
+    uint32_t priority = NVIC_GetPriority(SUBGHZ_Radio_IRQn);
+    
+    // Print the priority value; adjust the log function as needed
+    printf("SubGHz interrupt priority: %lu\r\n", priority);
+    // Or use another logging function, like:
+    // ESP_LOGI("DEBUG", "SubGHz interrupt priority: %lu", priority);
+}
+
 
 
 void MesherTask(void *pvParameters) {
@@ -1213,7 +1223,9 @@ void MesherTask(void *pvParameters) {
         ESP_LOGV(TAG, "u32SkippedPrintfMemMallocFromCircle        %d", u32SkippedPrintfMemMallocFromCircle);
         ESP_LOGV(TAG, "u32SkippedPrintfMemMallocBytesFromCircle   %d", u32SkippedPrintfMemMallocBytesFromCircle);
         ESP_LOGV(TAG, "u32SkippedSerialQueueSendFromCircle        %d", u32SkippedSerialQueueSendFromCircle);
-
+        ESP_LOGV(TAG, "------------------------------------");
+        printSubGHzInterruptPriority();
+        ESP_LOGV(TAG, "------------------------------------");
 
         #if USE_AS_CONCENTRATOR
         //Wait 5 seconds to send the next packet
@@ -1238,6 +1250,8 @@ void setup() {
     Serial.println("");
     Serial.println("");
     Serial.println("UART Initialized.");
+
+
 
 
     // Create the queue
@@ -1360,6 +1374,9 @@ void setup() {
     if (res != pdPASS) {
         ESP_LOGE("main", "MesherTask creation gave error: %d", res);
     }
+
+
+
 
     #ifndef ESP32
     vTaskStartScheduler();
