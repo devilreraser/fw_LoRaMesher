@@ -110,15 +110,15 @@ void RoutingTableService::updateMetricOfNextHop(RouteNode* rNode) {
 uint8_t RoutingTableService::calculateMetric(uint8_t previous_metric, uint8_t hops, uint8_t rlq, uint8_t tlq) {
     uint8_t factor_hops = LM_REDUCED_FACTOR_HOP_COUNT * hops * LM_MAX_METRIC;
 
-    printf("Factor hops: %d\r\n", factor_hops);
+    ESP_LOGV(TAG, "Factor hops: %d", factor_hops);
 
     uint8_t quality_link = (rlq + tlq) / 2;
 
-    printf("Received link quality: %d\r\n", rlq);
-    printf("Transmitted link quality: %d\r\n", tlq);
+    ESP_LOGV(TAG, "Received link quality: %d", rlq);
+    ESP_LOGV(TAG, "Transmitted link quality: %d", tlq);
 
-    printf("Quality link: %d\r\n", quality_link);
-    printf("Previous metric: %d\r\n", previous_metric);
+    ESP_LOGV(TAG, "Quality link: %d", quality_link);
+    ESP_LOGV(TAG, "Previous metric: %d", previous_metric);
 
     uint8_t new_metric = 0;
 
@@ -129,13 +129,13 @@ uint8_t RoutingTableService::calculateMetric(uint8_t previous_metric, uint8_t ho
     else {
         uint8_t factor_link_quality = LM_MAX_METRIC / std::sqrt((LM_MAX_METRIC / std::max(previous_metric, uint8_t(1))) ^ 2 + (LM_MAX_METRIC / std::max(quality_link, uint8_t(1))) ^ 2);
 
-        printf("Factor link quality: %d\r\n", factor_link_quality);
+        ESP_LOGV(TAG, "Factor link quality: %d", factor_link_quality);
 
         // Update the received link quality
         new_metric = std::min(factor_hops, factor_link_quality);
     }
 
-    printf("New metric: %d\r\n", new_metric);
+    ESP_LOGV(TAG, "New metric: %d", new_metric);
 
     return new_metric;
 }
@@ -181,7 +181,7 @@ bool RoutingTableService::processHelloPacket(HelloPacket* p, int8_t receivedSNR,
 
     uint8_t transmitted_link_quality = get_transmitted_link_quality(p);
 
-    printf("Transmitted link quality: %d\r\n", transmitted_link_quality);
+    ESP_LOGV(TAG, "Transmitted link quality: %d", transmitted_link_quality);
 
     routingTableList->setInUse();
 
@@ -310,7 +310,7 @@ bool RoutingTableService::processRoute(uint16_t via, NetworkNode* node, int8_t r
         uint8_t new_metric = calculateMetric(node->metric, node->hop_count, viaNode->received_link_quality, viaNode->transmitted_link_quality);
 
         if (new_metric <= rNode->networkNode.metric) {
-            printf("New metric is not better for %X via %X metric %d\r\n", node->address, via, node->metric);
+            ESP_LOGV(TAG, "New metric is not better for %X via %X metric %d", node->address, via, node->metric);
             updated = false;
         }
         else {
