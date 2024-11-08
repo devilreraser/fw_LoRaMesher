@@ -2,11 +2,57 @@
 #define _LORAMESHER_BUILD_OPTIONS_H
 
 #ifndef ESP32
+// #define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\r\n", tag, ##__VA_ARGS__)
+// #define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\r\n", tag, ##__VA_ARGS__)
+// #define ESP_LOGI(tag, format, ...) printf("[INFO] %s: " format "\r\n", tag, ##__VA_ARGS__)
+// #define ESP_LOGW(tag, format, ...) printf("[WARN] %s: " format "\r\n", tag, ##__VA_ARGS__)
+// #define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\r\n", tag, ##__VA_ARGS__)
+
+#if CORE_DEBUG_LEVEL >= 5
 #define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#else
+#define ESP_LOGV(tag, format, ...)
+#endif
+
+#if CORE_DEBUG_LEVEL >= 4
 #define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#else
+#define ESP_LOGD(tag, format, ...)
+#endif
+
+#if CORE_DEBUG_LEVEL >= 3
 #define ESP_LOGI(tag, format, ...) printf("[INFO] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#else
+#define ESP_LOGI(tag, format, ...)
+#endif
+
+#if CORE_DEBUG_LEVEL >= 2
 #define ESP_LOGW(tag, format, ...) printf("[WARN] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#else
+#define ESP_LOGW(tag, format, ...)
+#endif
+
+#if CORE_DEBUG_LEVEL >= 1
 #define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#else
+#define ESP_LOGE(tag, format, ...)
+#endif
+
+#if CORE_DEBUG_LEVEL == 0
+#undef ESP_LOGV
+#undef ESP_LOGD
+#undef ESP_LOGI
+#undef ESP_LOGW
+#undef ESP_LOGE
+
+#define ESP_LOGV(tag, format, ...)
+#define ESP_LOGD(tag, format, ...)
+#define ESP_LOGI(tag, format, ...)
+#define ESP_LOGW(tag, format, ...)
+#define ESP_LOGE(tag, format, ...)
+#endif
+
+
 #include "FreeRTOS.h"
 #include "portmacro.h"
 #include "semphr.h"
