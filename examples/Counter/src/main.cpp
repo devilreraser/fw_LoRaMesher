@@ -18,7 +18,7 @@
 
 #define TAG "main"
 
-#define USE_AS_CONCENTRATOR   1       /* 0:endpoint 1:concentrator */
+#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
 
 /* Comment/Comment out Following */
 //#define DEBUG_USE_BLINK_TASK
@@ -110,10 +110,13 @@ struct dataPacket {
 
 dataPacket* helloPacket = new dataPacket;
 
+static uint32_t u32HeardOurPackets = 0;
 
-// Limit the vector to store a maximum of 16 unique broadcast payloads
+
+
+// Limit the vector to store a maximum of 64 unique broadcast payloads
 std::vector<dataPacket> previousBroadcastPayloads;
-const size_t maxBroadcastPayloads = 16;
+const size_t maxBroadcastPayloads = 64;
 
 
 
@@ -272,6 +275,9 @@ bool CircularQueue_Dequeue(CircularQueue *queue, void **item) {
 static QueueHandle_t serialQueue = NULL;
 static SemaphoreHandle_t serialSemaphore = NULL;
 
+
+
+
 #define SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS pdMS_TO_TICKS(0)
 static uint32_t u32SkippedPrintfMemMalloc = 0;
 static uint32_t u32SkippedPrintfMemMallocBytes = 0;
@@ -286,11 +292,14 @@ static uint32_t u32SkippedPrintfMemMallocBytesFromCircle = 0;
 static uint32_t u32SkippedSerialQueueSendFromCircle = 0;
 
 
+
+
 extern "C" int _write(int file, char *ptr, int len) {
     // Ensure the length does not exceed BUFFER_SIZE
     int copyLen = (len < BUFFER_SIZE) ? len : BUFFER_SIZE;
 
     bool printOnReceiveFlag = false;
+
 
     if (serialQueue == NULL) 
     {
@@ -727,13 +736,26 @@ void processReceivedPackets(void*) {
             printDataPacket(packet);
 
             bool isUnique = false;
+            bool isOurs = false;
 
+            if (packet->src == radio.getLocalAddress())
+            {
+                isOurs = true;
+            }
+
+            // Check if the packet comes from us but is heard from another device
+            if (isOurs)
+            {
+                u32HeardOurPackets++;
+                isUnique = false;
+            }
             // Check if the packet is a broadcast message when endpoint
             #if USE_AS_CONCENTRATOR == 0
             if (packet->dst != BROADCAST_ADDR) 
             {
                 isUnique = true;
                 //to do remove duplicated if is concentrator and not broadcast because could come from several endpoints re-transmitted
+
             }
             else
             #endif
@@ -751,6 +773,7 @@ void processReceivedPackets(void*) {
                         break;
                     }
                 }
+
                 
                 // If unique, retransmit if needed and store in the list
                 if (isUnique) {
@@ -768,6 +791,7 @@ void processReceivedPackets(void*) {
                 }
             }
 
+            
 
 
             if (isUnique)
@@ -1196,6 +1220,24 @@ void MesherTask(void *pvParameters) {
 
 
         printRoutingTable();
+        ESP_LOGE(TAG, "routingTableSize                 %d", radio.routingTableSize());
+        ESP_LOGE(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
+        ESP_LOGE(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
+        ESP_LOGE(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
+        ESP_LOGE(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
+        ESP_LOGE(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
+        ESP_LOGE(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
+        ESP_LOGE(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
+        ESP_LOGE(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
+        ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+        ESP_LOGE(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
+        ESP_LOGE(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
+        ESP_LOGE(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
+        ESP_LOGE(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
+        ESP_LOGE(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
+        ESP_LOGE(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
+        ESP_LOGE(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
+        ESP_LOGE(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
 #if 0
 #endif
         ESP_LOGV(TAG, "routingTableSize                 %d", radio.routingTableSize());
@@ -1220,7 +1262,6 @@ void MesherTask(void *pvParameters) {
         ESP_LOGV(TAG, "getOnReceiveEventsCounter        %d", radio.getOnReceiveEventsCounter());
         ESP_LOGV(TAG, "u32SkippedPrintfMemMalloc        %d", u32SkippedPrintfMemMalloc);
         ESP_LOGV(TAG, "u32SkippedPrintfMemMallocBytes   %d", u32SkippedPrintfMemMallocBytes);
-        ESP_LOGV(TAG, "u32SkippedSerialQueueNull        %d", u32SkippedSerialQueueNull);
         ESP_LOGV(TAG, "u32SkippedSerialQueueSend        %d", u32SkippedSerialQueueSend);
         ESP_LOGV(TAG, "u32PrintfReceiveEventFlag        %d", u32PrintfReceiveEventFlag);
         ESP_LOGV(TAG, "u32SkippedPrintfCirMalloc        %d", u32SkippedPrintfCirMalloc);
@@ -1233,7 +1274,10 @@ void MesherTask(void *pvParameters) {
         printSubGHzInterruptPriority();
         ESP_LOGV(TAG, "------------------------------------");
 
+        ESP_LOGE(TAG, "u32HeardOurPackets               %d", u32HeardOurPackets);
         ESP_LOGE(TAG, "Free heap: %d", getFreeHeap());
+        radio.printAllPacketsInSendQueue(10);
+
 
         #if USE_AS_CONCENTRATOR
         //Wait 5 seconds to send the next packet
