@@ -611,7 +611,7 @@ void initLedLoRaE5Indication(void)
 
 
 void printRouteNode(RouteNode* routeNode) {
-    printf("Destination: %04X | Metric: %d | Next Hop (via): %04X | Hop Count: %d | Rx SNR: %d | Tx SNR: %d | Rx RSSI: %d | Tx RSSI: %d | SRTT: %d | RTTVAR: %d | Rx Metric: %d\r\n"
+    printf("Destination: %04X | Metric: %3d | Next Hop (via): %04X | Hop Count: %04d | Rx SNR: %3d | Tx SNR: %3d | Rx RSSI: %3d | Tx RSSI: %3d | SRTT: %3d | RTTVAR: %3d | Rx Metric: %3d\r\n"
         , routeNode->networkNode.address    // Destination node address in hexadecimal
         , routeNode->networkNode.metric     // Metric associated with this route
         , routeNode->via                    // Next hop address in hexadecimal
@@ -649,7 +649,7 @@ void printRoutingTable() {
  * @param data
  */
 void printPacket(dataPacket data) {
-    printf("Packet receive from %04X Nº %3d index\r\n", data.id_sender, data.counter);
+    ESP_LOGV(TAG, "Packet receive from %04X Nº %3d index", data.id_sender, data.counter);
 }
 
 /**
@@ -658,7 +658,7 @@ void printPacket(dataPacket data) {
  * @param packet
  */
 void printDataPacket(AppPacket<dataPacket>* packet) {
-    printf("Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
+    ESP_LOGV(TAG, "Packet arrived from %04X sz %3d bytes", packet->src, packet->payloadSize);
 
     //Get the payload to iterate through it
     dataPacket* dPacket = packet->payload;
@@ -1102,7 +1102,7 @@ void printSubGHzInterruptPriority() {
     uint32_t preemptPriority = (priority >> (8 - __NVIC_PRIO_BITS)) >> (priorityGrouping & 0x7);
     uint32_t subPriority = (priority & ((1 << (priorityGrouping & 0x7)) - 1));
 
-    printf("SubGHz Interrupt Preempt Priority: %lu, Sub-Priority: %lu\r\n", preemptPriority, subPriority);
+    ESP_LOGV(TAG, "SubGHz Interrupt Preempt Priority: %lu, Sub-Priority: %lu", preemptPriority, subPriority);
         // Replace SUBGHZ_Radio_IRQn with the actual IRQ number for SubGHz
     
     // Print the priority value; adjust the log function as needed
@@ -1232,6 +1232,8 @@ void MesherTask(void *pvParameters) {
         ESP_LOGV(TAG, "------------------------------------");
         printSubGHzInterruptPriority();
         ESP_LOGV(TAG, "------------------------------------");
+
+        ESP_LOGE(TAG, "Free heap: %d", getFreeHeap());
 
         #if USE_AS_CONCENTRATOR
         //Wait 5 seconds to send the next packet
