@@ -638,6 +638,41 @@ uint32_t LoraMesher::getMaxPropagationTime() {
     return maxTimeOnAir;
 }
 
+void LoraMesher::printAllPacketsInSendQueue(int maxPrintCount = 10) {
+    ToSendPackets->setInUse();  // Lock the queue for safe access
+    int count = 0;  // Initialize packet count
+
+    if (ToSendPackets->moveToStart()) {
+        int totalPackets = ToSendPackets->getLength();  // Get the total number of packets in the queue
+        ESP_LOGE(LM_TAG, "Total packets in the sending queue: %d", totalPackets);
+
+        do {
+            if (count >= maxPrintCount) {
+                ESP_LOGE(LM_TAG, "Print limit reached. Showing first %d packets only.", maxPrintCount);
+                break;  // Stop printing if the maximum print count is reached
+            }
+
+            QueuePacket<Packet<uint8_t>>* current = ToSendPackets->getCurrent();
+            Packet<uint8_t>* packet = current->packet;
+
+            // Print packet details
+            ESP_LOGE(LM_TAG, "Packet -- Size: %d, Src: %X, Dst: %X, Type: %d, Id: %d",
+                     packet->packetSize,
+                     packet->src,
+                     packet->dst,
+                     packet->type,
+                     packet->id);
+
+            count++;  // Increment the printed packet count
+        } while (ToSendPackets->next());  // Move to next packet
+    } else {
+        ESP_LOGE(LM_TAG, "No packets in the sending queue.");
+    }
+
+    ToSendPackets->releaseInUse();  // Release the queue lock
+}
+
+
 bool LoraMesher::sendPacket(Packet<uint8_t>* p) {
     waitBeforeSend(1);
 
@@ -693,6 +728,7 @@ void LoraMesher::sendPackets() {
 
             if (tx) {
                 ESP_LOGV(LM_TAG, "Send n. %d", sendCounter);
+                ESP_LOGE(LM_TAG, "Send n. %d", sendCounter);
 
                 if (tx->packet->src == getLocalAddress())
                     tx->packet->id = sendId++;

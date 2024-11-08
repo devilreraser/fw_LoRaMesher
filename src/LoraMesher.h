@@ -528,6 +528,10 @@ public:
      */
     void removeSimulatorService() { simulatorService = nullptr; }
 
+
+    // Declaration of the new function to print all packets in the sending queue
+    void printAllPacketsInSendQueue(int maxPrintCount);
+
 #ifndef LM_GOD_MODE
 private:
 #endif
