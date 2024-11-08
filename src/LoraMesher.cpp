@@ -373,7 +373,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        4096,
+        1024,
         this,
         6,
         &ReceivePacket_TaskHandle);
