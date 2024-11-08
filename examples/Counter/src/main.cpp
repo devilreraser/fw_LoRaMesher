@@ -658,7 +658,7 @@ void printPacket(dataPacket data) {
  * @param packet
  */
 void printDataPacket(AppPacket<dataPacket>* packet) {
-    printf("Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
+    ESP_LOGV(TAG, "Packet arrived from %04X sz %3d bytes\r\n", packet->src, packet->payloadSize);
 
     //Get the payload to iterate through it
     dataPacket* dPacket = packet->payload;

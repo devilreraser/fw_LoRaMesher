@@ -448,7 +448,6 @@ void LoraMesher::onReceive(void) {
     LoraMesher::getInstance().setOnReceiveEventsFlag();
     LoraMesher::getInstance().incOnReceiveEventsCounter();
     ESP_LOGI(LM_TAG, "LoraMesher::onReceive");
-    printf("onReceive\r\n");
 
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET_NOTIFY_RECEIVE_DATA
