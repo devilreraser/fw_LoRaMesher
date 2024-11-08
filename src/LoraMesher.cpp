@@ -466,6 +466,9 @@ void LoraMesher::onReceive(void) {
     #ifdef ON_RECEIVE_NOTIFY_WITH_BOOL
     b_on_receive_notify = true;
     #else
+    #if 0
+    xTaskNotify(LoraMesher::getInstance().ReceivePacket_TaskHandle, 0, eSetValueWithoutOverwrite);
+    #else
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xHigherPriorityTaskWoken = xTaskNotifyFromISR(
         LoraMesher::getInstance().ReceivePacket_TaskHandle,
@@ -473,6 +476,7 @@ void LoraMesher::onReceive(void) {
         eSetValueWithoutOverwrite,
         &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    #endif
     #endif
     #endif
 
