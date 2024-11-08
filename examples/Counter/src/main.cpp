@@ -18,7 +18,7 @@
 
 #define TAG "main"
 
-#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
+#define USE_AS_CONCENTRATOR   1       /* 0:endpoint 1:concentrator */
 
 /* Comment/Comment out Following */
 //#define DEBUG_USE_BLINK_TASK
@@ -523,14 +523,14 @@ void processLedLoRaE5Indication(void*) {
                     digitalWrite(ledPin, ledOn);
                     vTaskDelay(100 / portTICK_PERIOD_MS);
                     digitalWrite(ledPin, ledOff);
-                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    vTaskDelay(500 / portTICK_PERIOD_MS);
                     break;
 
                 case CODE_TX_MESSAGE:
                     digitalWrite(ledPin, ledOn);
                     vTaskDelay(2000 / portTICK_PERIOD_MS);
                     digitalWrite(ledPin, ledOff);
-                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    vTaskDelay(500 / portTICK_PERIOD_MS);
                     break;
 
                 // case CODE_INIT_START:
@@ -584,7 +584,7 @@ void sendLedLoRaE5Indication(e_LoRaE5IndicationCode code)
 
 void initLedLoRaE5Indication(void)
 {
-    uint16LedLoRaE5IndicationQueue = xQueueCreate(10, sizeof(uint16_t));
+    uint16LedLoRaE5IndicationQueue = xQueueCreate(32, sizeof(uint16_t));
     if (uint16LedLoRaE5IndicationQueue == nullptr) {
         ESP_LOGE(TAG, "Failed to create queue Led LoRa E5 Indication.");
     } else {
@@ -1096,11 +1096,17 @@ void setupLoraMesher() {
 }
 
 void printSubGHzInterruptPriority() {
-    // Replace SUBGHZ_Radio_IRQn with the actual IRQ number for SubGHz
+    uint32_t priorityGrouping = NVIC_GetPriorityGrouping();
     uint32_t priority = NVIC_GetPriority(SUBGHZ_Radio_IRQn);
+
+    uint32_t preemptPriority = (priority >> (8 - __NVIC_PRIO_BITS)) >> (priorityGrouping & 0x7);
+    uint32_t subPriority = (priority & ((1 << (priorityGrouping & 0x7)) - 1));
+
+    printf("SubGHz Interrupt Preempt Priority: %lu, Sub-Priority: %lu\r\n", preemptPriority, subPriority);
+        // Replace SUBGHZ_Radio_IRQn with the actual IRQ number for SubGHz
     
     // Print the priority value; adjust the log function as needed
-    printf("SubGHz interrupt priority: %lu\r\n", priority);
+    //printf("SubGHz interrupt priority: %lu\r\n", priority);
     // Or use another logging function, like:
     // ESP_LOGI("DEBUG", "SubGHz interrupt priority: %lu", priority);
 }
