@@ -387,19 +387,19 @@ void RoutingTableService::resetTimeoutRoutingNode(RouteNode* node) {
 }
 
 void RoutingTableService::printRoutingTable() {
-    ESP_LOGI(LM_TAG, "Current routing table:");
+    ESP_LOGE(LM_TAG, "Current routing table:");
 
     routingTableList->setInUse();
 
     if (routingTableList->moveToStart()) {
         size_t position = 0;
 
-        ESP_LOGI(LM_TAG, "---------- RTId %d and size: %d ----------", routingTableId, routingTableSize());
+        ESP_LOGE(LM_TAG, "---------- RTId %d and size: %d ----------", routingTableId, routingTableSize());
 
         do {
             RouteNode* node = routingTableList->getCurrent();
 
-            ESP_LOGI(LM_TAG, "%d - %X via %X metric %d hop_count %d role %d",
+            ESP_LOGE(LM_TAG, "%d - %X via %X metric %d hop_count %d role %d",
                 position,
                 node->networkNode.address,
                 node->via,
@@ -410,7 +410,7 @@ void RoutingTableService::printRoutingTable() {
             position++;
         } while (routingTableList->next());
 
-        ESP_LOGI(LM_TAG, "--------------------------------------------");
+        ESP_LOGE(LM_TAG, "--------------------------------------------");
     }
 
     routingTableList->releaseInUse();
