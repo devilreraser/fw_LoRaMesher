@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include "LoraMesher.h"
 
+#include "debug_heap.h"
+
 #if defined(ESP32)
 /*  */
 #elif defined(STM32)
@@ -99,6 +101,10 @@ QueueHandle_t uint16LedQueue = nullptr;
 #ifdef RGB_RED
 QueueHandle_t uint16LedRGBQueue = nullptr;
 #endif
+
+
+
+
 
 LoraMesher& radio = LoraMesher::getInstance();
 
@@ -324,6 +330,7 @@ extern "C" int _write(int file, char *ptr, int len) {
             u32SkippedPrintfMemMallocBytes += len;
             return -1;
         }
+        DebugHeapOnAllocation(ALLOCATION_PRINTF_QUEUE, (void*)buffer, copyLen + 1);
     }
     else
     {
@@ -334,6 +341,7 @@ extern "C" int _write(int file, char *ptr, int len) {
             u32SkippedPrintfCirMallocBytes += len;
             return -1;
         }
+        DebugHeapOnAllocation(ALLOCATION_PRINTF_CIRCLE, (void*)buffer, copyLen + 1);
     }
 
     // Copy data and null-terminate
@@ -354,16 +362,19 @@ extern "C" int _write(int file, char *ptr, int len) {
                     // Handle memory allocation failure
                     u32SkippedPrintfMemMallocFromCircle++;
                     u32SkippedPrintfMemMallocBytesFromCircle += len;
+                    DebugHeapOnFree(ALLOCATION_PRINTF_CIRCLE, (void*)bufferCopyOld);
                     circular_free(&buffer_uart_printf, bufferCopyOld);
-                    
                 }
                 else
                 {
+                    DebugHeapOnAllocation(ALLOCATION_PRINTF_QUEUE, (void*)bufferCopyNew, copyLenLoop + 1);
                     memcpy(bufferCopyNew, bufferCopyOld, copyLenLoop);
                     bufferCopyNew[copyLenLoop] = '\0';
+                    DebugHeapOnFree(ALLOCATION_PRINTF_CIRCLE, (void*)bufferCopyOld);
                     circular_free(&buffer_uart_printf, bufferCopyOld);
                     if (xQueueSend(serialQueue, &bufferCopyNew, SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS) != pdPASS) {
                         u32SkippedSerialQueueSendFromCircle++;
+                        DebugHeapOnFree(ALLOCATION_PRINTF_QUEUE, (void*)bufferCopyNew);
                         vPortFree(bufferCopyNew);  // Free the buffer
                     }
                 }
@@ -372,6 +383,7 @@ extern "C" int _write(int file, char *ptr, int len) {
 
         if (xQueueSend(serialQueue, &buffer, SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS) != pdPASS) {
             u32SkippedSerialQueueSend++;
+            DebugHeapOnFree(ALLOCATION_PRINTF_QUEUE, (void*)buffer);
             vPortFree(buffer);  // Free the buffer
             return -1;
         }
@@ -380,6 +392,7 @@ extern "C" int _write(int file, char *ptr, int len) {
     {
         if (CircularQueue_Enqueue(&circularQueue, buffer) != pdPASS) {
             u32SkippedCircleQueueSend++;
+            DebugHeapOnFree(ALLOCATION_PRINTF_CIRCLE, (void*)buffer);
             circular_free(&buffer_uart_printf, buffer);  // Free the buffer
             return -1;
         }
@@ -429,6 +442,7 @@ void serialTask(void *pvParameters) {
             }
 
             // Free the allocated memory
+            DebugHeapOnFree(ALLOCATION_PRINTF_QUEUE, (void*)msg);
             vPortFree(msg);
         }
 
@@ -1220,24 +1234,24 @@ void MesherTask(void *pvParameters) {
 
 
         printRoutingTable();
-        ESP_LOGE(TAG, "routingTableSize                 %d", radio.routingTableSize());
-        ESP_LOGE(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
-        ESP_LOGE(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
-        ESP_LOGE(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
-        ESP_LOGE(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
-        ESP_LOGE(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
-        ESP_LOGE(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
-        ESP_LOGE(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
-        ESP_LOGE(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
-        ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
-        ESP_LOGE(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
-        ESP_LOGE(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
-        ESP_LOGE(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
-        ESP_LOGE(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
-        ESP_LOGE(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
-        ESP_LOGE(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
-        ESP_LOGE(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
-        ESP_LOGE(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
+        // ESP_LOGE(TAG, "routingTableSize                 %d", radio.routingTableSize());
+        // ESP_LOGE(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
+        // ESP_LOGE(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
+        // ESP_LOGE(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
+        // ESP_LOGE(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
+        // ESP_LOGE(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
+        // ESP_LOGE(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
+        // ESP_LOGE(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
+        // ESP_LOGE(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
+        // ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+        // ESP_LOGE(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
+        // ESP_LOGE(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
+        // ESP_LOGE(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
+        // ESP_LOGE(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
+        // ESP_LOGE(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
+        // ESP_LOGE(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
+        // ESP_LOGE(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
+        // ESP_LOGE(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
 #if 0
 #endif
         ESP_LOGV(TAG, "routingTableSize                 %d", radio.routingTableSize());
@@ -1277,6 +1291,10 @@ void MesherTask(void *pvParameters) {
         ESP_LOGE(TAG, "u32HeardOurPackets               %d", u32HeardOurPackets);
         ESP_LOGE(TAG, "Free heap: %d", getFreeHeap());
         radio.printAllPacketsInSendQueue(10);
+        radio.printAllPacketsInRecvQueue(10);
+        radio.printAllPacketsInDataQueue(10);
+
+        DebugHeapPrint();
 
 
         #if USE_AS_CONCENTRATOR
@@ -1293,6 +1311,7 @@ void MesherTask(void *pvParameters) {
 
 void setup() {
 
+    DebugHeapInit();
     initBuffer(&buffer_uart_printf);
     CircularQueue_Init(&circularQueue);
     int res;
