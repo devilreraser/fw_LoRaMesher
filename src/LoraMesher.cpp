@@ -644,11 +644,11 @@ void LoraMesher::printAllPacketsInSendQueue(int maxPrintCount = 10) {
 
     if (ToSendPackets->moveToStart()) {
         int totalPackets = ToSendPackets->getLength();  // Get the total number of packets in the queue
-        ESP_LOGE(LM_TAG, "Total packets in the sending queue: %d", totalPackets);
+        ESP_LOGE(LM_TAG, "Total packets in the Send queue: %d", totalPackets);
 
         do {
             if (count >= maxPrintCount) {
-                ESP_LOGE(LM_TAG, "Print limit reached. Showing first %d packets only.", maxPrintCount);
+                ESP_LOGE(LM_TAG, "Send Print limit reached. Showing first %d packets only.", maxPrintCount);
                 break;  // Stop printing if the maximum print count is reached
             }
 
@@ -656,7 +656,7 @@ void LoraMesher::printAllPacketsInSendQueue(int maxPrintCount = 10) {
             Packet<uint8_t>* packet = current->packet;
 
             // Print packet details
-            ESP_LOGE(LM_TAG, "Packet -- Size: %d, Src: %X, Dst: %X, Type: %d, Id: %d",
+            ESP_LOGE(LM_TAG, "Send Packet -- Size: %d, Src: %X, Dst: %X, Type: %d, Id: %d",
                      packet->packetSize,
                      packet->src,
                      packet->dst,
@@ -666,10 +666,80 @@ void LoraMesher::printAllPacketsInSendQueue(int maxPrintCount = 10) {
             count++;  // Increment the printed packet count
         } while (ToSendPackets->next());  // Move to next packet
     } else {
-        ESP_LOGE(LM_TAG, "No packets in the sending queue.");
+        ESP_LOGE(LM_TAG, "No packets in the Send queue.");
     }
 
     ToSendPackets->releaseInUse();  // Release the queue lock
+}
+
+void LoraMesher::printAllPacketsInRecvQueue(int maxPrintCount = 10) {
+    ReceivedPackets->setInUse();  // Lock the queue for safe access
+    int count = 0;  // Initialize packet count
+
+    if (ReceivedPackets->moveToStart()) {
+        int totalPackets = ReceivedPackets->getLength();  // Get the total number of packets in the queue
+        ESP_LOGE(LM_TAG, "Total packets in the Recv queue: %d", totalPackets);
+
+        do {
+            if (count >= maxPrintCount) {
+                ESP_LOGE(LM_TAG, "Recv Print limit reached. Showing first %d packets only.", maxPrintCount);
+                break;  // Stop printing if the maximum print count is reached
+            }
+
+            QueuePacket<Packet<uint8_t>>* current = ReceivedPackets->getCurrent();
+            Packet<uint8_t>* packet = current->packet;
+
+            // Print packet details
+            ESP_LOGE(LM_TAG, "Recv Packet -- Size: %d, Src: %X, Dst: %X, Type: %d, Id: %d",
+                     packet->packetSize,
+                     packet->src,
+                     packet->dst,
+                     packet->type,
+                     packet->id);
+
+            count++;  // Increment the printed packet count
+        } while (ReceivedPackets->next());  // Move to next packet
+    } else {
+        ESP_LOGE(LM_TAG, "No packets in the Recv queue.");
+    }
+
+    ReceivedPackets->releaseInUse();  // Release the queue lock
+}
+
+
+void LoraMesher::printAllPacketsInDataQueue(int maxPrintCount = 10) {
+    ReceivedAppPackets->setInUse();  // Lock the queue for safe access
+    int count = 0;  // Initialize packet count
+
+    if (ReceivedAppPackets->moveToStart()) {
+        int totalPackets = ReceivedAppPackets->getLength();  // Get the total number of packets in the queue
+        ESP_LOGE(LM_TAG, "Total packets in the Data queue: %d", totalPackets);
+
+        do {
+            if (count >= maxPrintCount) {
+                ESP_LOGE(LM_TAG, "Data Print limit reached. Showing first %d packets only.", maxPrintCount);
+                break;  // Stop printing if the maximum print count is reached
+            }
+
+            AppPacket<uint8_t>* current = ReceivedAppPackets->getCurrent();
+
+            // Print packet details
+            ESP_LOGE(LM_TAG, "Data Packet -- Size: %d, Src: %X, Dst: %X, Data[0]: %02X, Data[1]: %02X, Data[2]: %02X, Data[3]: %02X",
+                     current->payloadSize,
+                     current->src,
+                     current->dst,
+                     current->payload[0],
+                     current->payload[1],
+                     current->payload[2],
+                     current->payload[3]);
+
+            count++;  // Increment the printed packet count
+        } while (ReceivedAppPackets->next());  // Move to next packet
+    } else {
+        ESP_LOGE(LM_TAG, "No packets in the Data queue.");
+    }
+
+    ReceivedAppPackets->releaseInUse();  // Release the queue lock
 }
 
 
@@ -1166,25 +1236,14 @@ void LoraMesher::processDataPacket(QueuePacket<DataPacket>* pq) {
     if (packet->dst == getLocalAddress()) {
         ESP_LOGV(LM_TAG, "Data packet from %X for me, type %d", packet->src);
         incDataPacketForMe();
-
         processDataPacketForMe(pq);
         return;
-
     }
     else if (packet->dst == BROADCAST_ADDR) {
         ESP_LOGV(LM_TAG, "Data packet from %X BROADCAST", packet->src);
         incReceivedBroadcast();
-        #ifndef LM_RETRANSMIT_BROADCASTS
         processDataPacketForMe(pq);
-        #endif
-        #ifdef LM_RETRANSMIT_BROADCASTS
-        processDataPacketForMeBroadcastRetransmitted(pq);
-        ESP_LOGV(LM_TAG, "Data Packet from %X for %X. Via is me. Forwarding it", packet->src, packet->dst);
-        incReceivedIAmVia();
-        addToSendOrderedAndNotify(reinterpret_cast<QueuePacket<Packet<uint8_t>>*>(pq));
-        #endif
         return;
-
     }
     else if (packet->via == getLocalAddress()) {
         ESP_LOGV(LM_TAG, "Data Packet from %X for %X. Via is me. Forwarding it", packet->src, packet->dst);

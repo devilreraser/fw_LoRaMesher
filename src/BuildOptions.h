@@ -131,10 +131,6 @@ extern const char* LM_VERSION;
 // Comment this line if you want to remove the crc for each packet
 #define LM_ADDCRC_PAYLOAD
 
-// Comment this line if not needed to retransmit broadcast packets inside the library
-//#define LM_RETRANSMIT_BROADCASTS
-
-
 // Routing table max size
 #define RTMAXSIZE 256
 

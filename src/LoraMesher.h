@@ -532,6 +532,12 @@ public:
     // Declaration of the new function to print all packets in the sending queue
     void printAllPacketsInSendQueue(int maxPrintCount);
 
+    // Declaration of the new function to print all packets in the receive queue
+    void printAllPacketsInRecvQueue(int maxPrintCount);
+
+    // Declaration of the new function to print all packets in the receive data queue
+    void printAllPacketsInDataQueue(int maxPrintCount);
+
 #ifndef LM_GOD_MODE
 private:
 #endif

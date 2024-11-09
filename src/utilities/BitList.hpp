@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <algorithm>
 
+#include "debug_heap.h"
+
 class BitList {
 public:
     BitList(size_t bitCount): size((bitCount + 7) / 8), currentIndex(0), isValid(true) {
@@ -14,11 +16,16 @@ public:
             isValid = false;  // Set a flag if allocation fails
             return;
         }
+        DebugHeapOnAllocation(ALLOCATION_BIT_LIST, (void*)bits, size);
         std::fill(bits, bits + size, 0);
     }
 
     ~BitList() {
-        if (bits) free(bits);
+        if (bits) 
+        {
+            DebugHeapOnFree(ALLOCATION_BIT_LIST, (void*)bits);
+            free(bits);
+        }
     }
 
     bool addBit(bool bit) {
