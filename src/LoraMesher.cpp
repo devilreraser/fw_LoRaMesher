@@ -379,7 +379,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        1024,
+        512,
         this,
         6,
         &ReceivePacket_TaskHandle);
@@ -411,7 +411,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->processPackets(); },
         "Process routine",
-        1024,
+        512,
         this,
         3,
         &ReceiveData_TaskHandle);
@@ -423,7 +423,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->routingTableManager(); },
         "Routing Table Manager routine",
-        1024,
+        512,
         this,
         2,
         &RoutingTableManager_TaskHandle);
@@ -435,7 +435,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->queueManager(); },
         "Queue Manager routine",
-        1024,
+        512,
         this,
         2,
         &QueueManager_TaskHandle);

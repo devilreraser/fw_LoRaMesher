@@ -1,6 +1,8 @@
 #ifndef _LORAMESHER_BUILD_OPTIONS_H
 #define _LORAMESHER_BUILD_OPTIONS_H
 
+#include <stdio.h>
+
 #ifndef ESP32
 // #define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\r\n", tag, ##__VA_ARGS__)
 // #define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\r\n", tag, ##__VA_ARGS__)
@@ -132,7 +134,7 @@ extern const char* LM_VERSION;
 #define LM_ADDCRC_PAYLOAD
 
 // Routing table max size
-#define RTMAXSIZE 256
+#define RTMAXSIZE 32
 
 //MAX packet size per packet in bytes. It could be changed between 13 and 255 bytes. Recommended 100 or less bytes.
 //If exceed it will be automatically separated through multiple packets 
@@ -176,7 +178,7 @@ const char* getPacketType(uint8_t type);
 #define LM_MAX_HOPS 10
 #define LM_REDUCED_FACTOR_HOP_COUNT 0.97
 #define LM_MAX_METRIC 255
-#define LM_MAX_NODES 255
+//#define LM_MAX_NODES 255 unknown - not used 
 
 //Role Types
 #define ROLE_DEFAULT 0b00000000

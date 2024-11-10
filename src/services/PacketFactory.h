@@ -11,6 +11,7 @@ typedef enum {
     PACKET_TYPE_CREATE_CONTROL_PACKET,
     PACKET_TYPE_CREATE_EMPTY_CONTROL_PACKET,
     PACKET_TYPE_CREATE_DATA_PACKET,
+    PACKET_TYPE_CREATE_HELLO_PACKET,
 
 } ePacketType_t;
 
@@ -48,7 +49,7 @@ public:
             packetSize = maxPacketSize;
         }
 
-        ESP_LOGV(LM_TAG, "Creating packet with %d bytes", packetSize);
+        ESP_LOGV(LM_TAG, "Creating packet type %d with %d bytes", packet_type, packetSize);
 
         T* p = static_cast<T*>(pvPortMalloc(packetSize));
 
@@ -70,7 +71,11 @@ public:
                 case PACKET_TYPE_CREATE_DATA_PACKET:
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_DATA_PACKET, packetSize);
                     break;
+                case PACKET_TYPE_CREATE_HELLO_PACKET:
+                    DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_HELLO, packetSize);
+                    break;
                 default:
+                    ESP_LOGE(LM_TAG, "Creating packet type unknown: %d with %d bytes", packet_type, packetSize);
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, packetSize);
                     break;
             }
@@ -94,7 +99,11 @@ public:
             case PACKET_TYPE_CREATE_DATA_PACKET:
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_DATA_PACKET, (void*)p, packetSize);
                 break;
+            case PACKET_TYPE_CREATE_HELLO_PACKET:
+                DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_HELLO, (void*)p, packetSize);
+                break;
             default:
+                ESP_LOGE(LM_TAG, "Creating packet type unknown: %d with %d bytes", packet_type, packetSize);
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, (void*)p, packetSize);
                 break;
         }

@@ -122,7 +122,7 @@ static uint32_t u32HeardOurPackets = 0;
 
 // Limit the vector to store a maximum of 64 unique broadcast payloads
 std::vector<dataPacket> previousBroadcastPayloads;
-const size_t maxBroadcastPayloads = 64;
+const size_t maxBroadcastPayloads = 32; //256 bytes 32 payloads
 
 
 
@@ -735,8 +735,8 @@ void printRouteNode(RouteNode* routeNode) {
 
 void printRoutingTable() {
     // Get a copy of the routing table
-    LM_LinkedList<RouteNode>* routingTable = radio.routingTableListCopy();
     
+    LM_LinkedList<RouteNode>* routingTable = radio.routingTableListCopy();
     if (routingTable->getLength() > 0) {
         printf("Routing Table:\r\n");
         routingTable->each(printRouteNode);  // Apply the print function to each route node
@@ -993,7 +993,7 @@ void createReceiveMessages() {
     int res = xTaskCreate(
         processReceivedPackets,
         "Receive App Task",
-        1024,
+        512,
         (void*) 1,
         2,
         &receiveLoRaMessage_Handle);
@@ -1067,7 +1067,7 @@ TaskHandle_t ledIndcation_Handle = NULL;
 void createLedIndication() {
     int res = xTaskCreate(
         processLedIndcation,
-        "Receive App Task",
+        "Led Indication Task",
         4096,
         (void*) 1,
         2,
@@ -1389,9 +1389,12 @@ void MesherTask(void *pvParameters) {
                 break;
             case 9:
                 radio.printAllPacketsInRecvQueue(10);
+                radio.printAllPacketsInDataQueue(10);
                 break;
             case 10:
-                radio.printAllPacketsInDataQueue(10);
+                ESP_LOGE(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                ESP_LOGE(TAG, "previousBroadcastPayloads.size() %d", previousBroadcastPayloads.size());
+                ESP_LOGE(TAG, "radio.routingTableSize()         %d", radio.routingTableSize());
                 break;
             case 11:
                 DebugTaskPrintStats();
@@ -1550,7 +1553,7 @@ void setup() {
     #endif
 
     // Create task for printf -> Serial handling
-    res = xTaskCreate(MesherTask,"MesherTask",1024, NULL, 1, NULL);
+    res = xTaskCreate(MesherTask,"MesherTask",512, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "MesherTask creation gave error: %d", res);
     }
