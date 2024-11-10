@@ -132,7 +132,7 @@ const size_t maxBroadcastPayloads = 64;
 #include <stdint.h>
 #include <string.h>
 
-#define CIRCULAR_BUFFER_SIZE 2048  // Define the total buffer size
+#define CIRCULAR_BUFFER_SIZE 1024  // Define the total buffer size
 
 typedef struct {
     char data[CIRCULAR_BUFFER_SIZE];  // Fixed circular buffer
@@ -275,8 +275,8 @@ bool CircularQueue_Dequeue(CircularQueue *queue, void **item) {
 
 
 
-#define BUFFER_SIZE 1024
-#define QUEUE_LENGTH 96
+#define BUFFER_SIZE 2048
+#define QUEUE_LENGTH 128
 
 static QueueHandle_t serialQueue = NULL;
 static SemaphoreHandle_t serialSemaphore = NULL;
@@ -1294,8 +1294,21 @@ void MesherTask(void *pvParameters) {
         radio.printAllPacketsInRecvQueue(10);
         radio.printAllPacketsInDataQueue(10);
 
-        DebugHeapPrint();
+        DebugHeapPrint(true);
+        //DebugHeapPrintPears(ALLOCATION_CREATE_PACKET);
+        //DebugHeapPrintPears(ALLOCATION_CREATE_PACKET, 32);
 
+        ESP_LOGE(TAG, "getOnReceiveEventsCounter        %d", radio.getOnReceiveEventsCounter());
+        ESP_LOGE(TAG, "u32SkippedPrintfMemMalloc        %d", u32SkippedPrintfMemMalloc);
+        ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytes   %d", u32SkippedPrintfMemMallocBytes);
+        ESP_LOGE(TAG, "u32SkippedSerialQueueSend        %d", u32SkippedSerialQueueSend);
+        ESP_LOGE(TAG, "u32PrintfReceiveEventFlag        %d", u32PrintfReceiveEventFlag);
+        ESP_LOGE(TAG, "u32SkippedPrintfCirMalloc        %d", u32SkippedPrintfCirMalloc);
+        ESP_LOGE(TAG, "u32SkippedPrintfCirMallocBytes   %d", u32SkippedPrintfCirMallocBytes);
+        ESP_LOGE(TAG, "u32SkippedCircleQueueSend        %d", u32SkippedCircleQueueSend);
+        ESP_LOGE(TAG, "u32SkippedPrintfMemMallocFromCircle        %d", u32SkippedPrintfMemMallocFromCircle);
+        ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytesFromCircle   %d", u32SkippedPrintfMemMallocBytesFromCircle);
+        ESP_LOGE(TAG, "u32SkippedSerialQueueSendFromCircle        %d", u32SkippedSerialQueueSendFromCircle);
 
         #if USE_AS_CONCENTRATOR
         //Wait 5 seconds to send the next packet
