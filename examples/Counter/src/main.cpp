@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "LoraMesher.h"
+#include "services\RoutingTableService.h"
 
 #include "debug_root.h"
 
@@ -733,6 +734,12 @@ void printRouteNode(RouteNode* routeNode) {
         );
 }
 
+
+
+
+    
+
+
 void printRoutingTable() {
     // Get a copy of the routing table
     
@@ -1249,6 +1256,8 @@ void MesherTask(void *pvParameters) {
 
     int printLoopState = 0;
 
+    int printDetailsLoopState = 0;
+
     #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
     //sendLedLoRaE5Indication(CODE_INIT_START);
     #endif
@@ -1382,7 +1391,12 @@ void MesherTask(void *pvParameters) {
                 ESP_LOGE(TAG, "Free heap:           %d", getFreeHeap());
                 break;
             case 7:
-                DebugHeapPrintPears(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, 32);
+                if (printDetailsLoopState >= ALLOCATION_COUNT)
+                {
+                    printDetailsLoopState = 0;
+                }
+                DebugHeapPrintPears((e_AllocationName_t)printDetailsLoopState, 32);
+                printDetailsLoopState++;
                 break;
             case 8:
                 radio.printAllPacketsInSendQueue(10);
@@ -1392,10 +1406,18 @@ void MesherTask(void *pvParameters) {
                 radio.printAllPacketsInDataQueue(10);
                 break;
             case 10:
-                ESP_LOGE(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                ESP_LOGE(TAG, "previousBroadcastPayloads.size() %d", previousBroadcastPayloads.size());
-                ESP_LOGE(TAG, "radio.routingTableSize()         %d", radio.routingTableSize());
+                ESP_LOGE(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                ESP_LOGE(TAG, "previousBroadcastPayloads.size()         %d", previousBroadcastPayloads.size());
+                ESP_LOGE(TAG, "radio.routingTableSize()                 %d", radio.routingTableSize());
+                ESP_LOGE(TAG, "radio.q_WSP->getLength()                 %d", radio.q_WSP->getLength());
+                ESP_LOGE(TAG, "radio.q_WRP->getLength()                 %d", radio.q_WRP->getLength());
+                ESP_LOGE(TAG, "radio.ReceivedAppPackets->getLength()    %d", radio.ReceivedAppPackets->getLength());
+                ESP_LOGE(TAG, "radio.ReceivedPackets->getLength()       %d", radio.ReceivedPackets->getLength());
+                ESP_LOGE(TAG, "radio.ToSendPackets->getLength()         %d", radio.ToSendPackets->getLength());
+                ESP_LOGE(TAG, "routingTableList->getLength()            %d", RoutingTableService::routingTableList->getLength());
+
                 break;
+
             case 11:
                 DebugTaskPrintStats();
                 break;

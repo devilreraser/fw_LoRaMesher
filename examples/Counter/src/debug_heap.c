@@ -8,7 +8,7 @@
 
 #define TAG "DBG_HEAP"
 
-#define ALLOCATION_PAIR_MAX 32
+#define ALLOCATION_PAIR_MAX 64
 
 //#define SEMAPHORE_WAIT_TICKS    pdMS_TO_TICKS(10)
 #define SEMAPHORE_WAIT_TICKS    portMAX_DELAY
@@ -46,6 +46,13 @@ uint32_t u32DebugHeapOnFreeSkippedCheckAll = 0;
 
 uint32_t u32OnAllocationSkipPrintfCircle = 0;
 uint32_t u32OnAllocationSkipPrintfQueue = 0;
+uint32_t u32OnAllocationSkipAppPacket = 0;
+uint32_t u32OnAllocationSkipCopyPacket = 0;
+uint32_t u32OnAllocationSkipRoutingTable = 0;
+uint32_t u32OnAllocationSkipRoutingPacket = 0;
+uint32_t u32OnAllocationSkipControlPacket = 0;
+uint32_t u32OnAllocationSkipControlEmpty = 0;
+uint32_t u32OnAllocationSkipUnknownPacket = 0;
 
 
 
@@ -247,7 +254,14 @@ void DebugHeapPrint(bool skipUnused) {
     ESP_LOGE(TAG, "u32DebugHeapOnFreeSkippedCheckAll:   %d", u32DebugHeapOnFreeSkippedCheckAll);
     ESP_LOGE(TAG, "u32OnAllocationSkipPrintfCircle:     %d", u32OnAllocationSkipPrintfCircle);
     ESP_LOGE(TAG, "u32OnAllocationSkipPrintfQueue:      %d", u32OnAllocationSkipPrintfQueue);
-
+    ESP_LOGE(TAG, "u32OnAllocationSkipAppPacket:        %d", u32OnAllocationSkipAppPacket);
+    ESP_LOGE(TAG, "u32OnAllocationSkipCopyPacket:       %d", u32OnAllocationSkipCopyPacket);
+    ESP_LOGE(TAG, "u32OnAllocationSkipRoutingTable:     %d", u32OnAllocationSkipRoutingTable);
+    ESP_LOGE(TAG, "u32OnAllocationSkipRoutingPacket:    %d", u32OnAllocationSkipRoutingPacket);
+    ESP_LOGE(TAG, "u32OnAllocationSkipControlPacket:    %d", u32OnAllocationSkipControlPacket);
+    ESP_LOGE(TAG, "u32OnAllocationSkipControlEmpty:     %d", u32OnAllocationSkipControlEmpty);
+    ESP_LOGE(TAG, "u32OnAllocationSkipUnknownPacket:    %d", u32OnAllocationSkipUnknownPacket);
+    
 }
 
 void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen) {
@@ -294,6 +308,41 @@ void DebugHeapOnAllocationSkipPrintfCircle(void)
 void DebugHeapOnAllocationSkipPrintfQueue(void)
 {
     u32OnAllocationSkipPrintfQueue++;
+}
+
+void DebugHeapOnAllocationSkipAppPacket(void)
+{
+    u32OnAllocationSkipAppPacket++;
+}
+
+void DebugHeapOnAllocationSkipCopyPacket(void)
+{
+    u32OnAllocationSkipCopyPacket++;
+}
+
+void DebugHeapOnAllocationSkipRoutingTable(void)
+{
+    u32OnAllocationSkipRoutingTable++;
+}
+
+void DebugHeapOnAllocationSkipRoutingPacket(void)
+{
+    u32OnAllocationSkipRoutingPacket++;
+}
+
+void DebugHeapOnAllocationSkipControlPacket(void)
+{
+    u32OnAllocationSkipControlPacket++;
+}
+
+void DebugHeapOnAllocationSkipControlEmpty(void)
+{
+    u32OnAllocationSkipControlEmpty++;
+}
+
+void DebugHeapOnAllocationSkipUnknownPacket(void)
+{
+    u32OnAllocationSkipUnknownPacket++;
 }
 
 /* Heap Leak Debugging Final */
