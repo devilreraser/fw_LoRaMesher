@@ -8,22 +8,29 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
+#define USE_ALLOCATION_PRINTF_CIRCLE    0
+#define USE_ALLOCATION_PRINTF_QUEUE     0
+
 
 typedef enum {
-    ALLOCATION_PRINTF_CIRCLE                = 0,
-    ALLOCATION_PRINTF_QUEUE                 = 1,
-    ALLOCATION_BIT_LIST                     = 2,
-    ALLOCATION_APP_PACKET                   = 3,
-    ALLOCATION_EMPTY_PACK                   = 4,
-    ALLOCATION_APP_PACKET_CREATE_CONVERT    = 5,
-    ALLOCATION_COPY_PACKET                  = 6,
-    ALLOCATION_CREATE_PACKET_ROUTING_TABLE  = 7,
-    ALLOCATION_CREATE_PACKET_ROUTING_PACKET = 8,
-    PACKET_TYPE_CREATE_HELLO_PACKET         = 9,
-    ALLOCATION_CREATE_PACKET_CONTROL        = 10,
-    ALLOCATION_CREATE_PACKET_EMPTY_CONTROL  = 11,
-    ALLOCATION_CREATE_PACKET_DATA_PACKET    = 12,
-    ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET = 13,
+    #if USE_ALLOCATION_PRINTF_CIRCLE
+    ALLOCATION_PRINTF_CIRCLE               ,
+    #endif
+    #if USE_ALLOCATION_PRINTF_QUEUE
+    ALLOCATION_PRINTF_QUEUE                ,
+    #endif
+    ALLOCATION_BIT_LIST                    ,
+    ALLOCATION_APP_PACKET                  ,
+    ALLOCATION_EMPTY_PACK                  ,
+    ALLOCATION_APP_PACKET_CREATE_CONVERT   ,
+    ALLOCATION_COPY_PACKET                 ,
+    ALLOCATION_CREATE_PACKET_ROUTING_TABLE ,
+    ALLOCATION_CREATE_PACKET_ROUTING_PACKET,
+    PACKET_TYPE_CREATE_HELLO_PACKET        ,
+    ALLOCATION_CREATE_PACKET_CONTROL       ,
+    ALLOCATION_CREATE_PACKET_EMPTY_CONTROL ,
+    ALLOCATION_CREATE_PACKET_DATA_PACKET   ,
+    ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET,
     ALLOCATION_COUNT
 
 } e_AllocationName_t;
@@ -31,12 +38,14 @@ typedef enum {
 
 
 void DebugHeapInit(void);
+void DebugHeapOnAllocationFail(e_AllocationName_t eName, uint32_t nSize);
 void DebugHeapOnAllocation(e_AllocationName_t eName, void* pData, uint32_t nSize);
 void DebugHeapOnFree(e_AllocationName_t eName, void* pData);
 void DebugHeapOnFreeCheckAll(void* pData);
 void DebugHeapPrint(bool skipUnused);
-//void DebugHeapPrintPears(e_AllocationName_t eName);
 void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen);
+void DebugHeapOnAllocationSkipPrintfCircle(void);
+void DebugHeapOnAllocationSkipPrintfQueue(void);
 
 #ifdef __cplusplus
 }

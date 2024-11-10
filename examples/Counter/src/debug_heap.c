@@ -8,7 +8,11 @@
 
 #define TAG "DBG_HEAP"
 
-#define ALLOCATION_PAIR_MAX 128
+#define ALLOCATION_PAIR_MAX 32
+
+//#define SEMAPHORE_WAIT_TICKS    pdMS_TO_TICKS(10)
+#define SEMAPHORE_WAIT_TICKS    portMAX_DELAY
+//#define SEMAPHORE_WAIT_TICKS    0
 
 typedef struct {
     uint32_t u32AllocatedBytesTotal;
@@ -35,8 +39,23 @@ s_AllocationPair_t asDebugHeapPair[ALLOCATION_COUNT][ALLOCATION_PAIR_MAX] = {0};
 size_t nDebugHeapPairCount[ALLOCATION_COUNT] = {0};     /* should be same as u32AllocatedTimesNow */
 size_t nNotMonitoredMemoryFreeTimes = 0;
 
+uint32_t u32DebugHeapOnAllocationSkipped[ALLOCATION_COUNT] = {0};
+uint32_t u32DebugHeapOnAllocationFail[ALLOCATION_COUNT] = {0};
+uint32_t u32DebugHeapOnFreeSkipped[ALLOCATION_COUNT] = {0};
+uint32_t u32DebugHeapOnFreeSkippedCheckAll = 0;
+
+uint32_t u32OnAllocationSkipPrintfCircle = 0;
+uint32_t u32OnAllocationSkipPrintfQueue = 0;
+
+
+
+
+SemaphoreHandle_t semphrDebugHeapBusy = NULL;
+
 void DebugHeapInit(void)
 {
+    semphrDebugHeapBusy = xSemaphoreCreateBinary();
+    xSemaphoreGive(semphrDebugHeapBusy);
     for (int index = 0; index < ALLOCATION_COUNT; index++)
     {
         asDebugHeapAllocation[index].u32SingleAllocationBytesMax = 0;
@@ -63,34 +82,53 @@ uint32_t findAllocationSize(e_AllocationName_t eName, void* pData) {
     // Address not found
     return 0;
 }
+
+void DebugHeapOnAllocationFail(e_AllocationName_t eName, uint32_t nSize)
+{
+    if (eName < ALLOCATION_COUNT)
+    {
+        u32DebugHeapOnAllocationFail[eName]++;
+    }
+}
+
 void DebugHeapOnAllocation(e_AllocationName_t eName, void* pData, uint32_t nSize)
 {
     if (pData == NULL || eName < ALLOCATION_COUNT)
     {
-        // Get the current allocation count for this allocation name
-        size_t* pairCount = &nDebugHeapPairCount[eName];
-        // Add the allocation to the tracking array
-        asDebugHeapPair[eName][*pairCount].pData = pData;
-        asDebugHeapPair[eName][*pairCount].nSize = nSize;
-        asDebugHeapPair[eName][*pairCount].nPosAllocate = asDebugHeapAllocation[eName].u32AllocatedTimesTotal;
-        (*pairCount)++;  // Increment the allocation count
-
-        asDebugHeapAllocation[eName].u32AllocatedBytesTotal += nSize;
-        asDebugHeapAllocation[eName].u32AllocatedBytesNow += nSize;
-        asDebugHeapAllocation[eName].u32AllocatedTimesTotal++;
-        asDebugHeapAllocation[eName].u32AllocatedTimesNow++;
-        if (asDebugHeapAllocation[eName].u32SingleAllocationBytesMax < nSize)
+        if (xSemaphoreTake(semphrDebugHeapBusy, SEMAPHORE_WAIT_TICKS) == pdFALSE)
         {
-            asDebugHeapAllocation[eName].u32SingleAllocationBytesMax = nSize;
+            u32DebugHeapOnAllocationSkipped[eName]++;
         }
-        if (asDebugHeapAllocation[eName].u32SingleAllocationBytesMin > nSize)
+        else
         {
-            asDebugHeapAllocation[eName].u32SingleAllocationBytesMin = nSize;
+            // Get the current allocation count for this allocation name
+            size_t* pairCount = &nDebugHeapPairCount[eName];
+            // Add the allocation to the tracking array
+            asDebugHeapPair[eName][*pairCount].pData = pData;
+            asDebugHeapPair[eName][*pairCount].nSize = nSize;
+            asDebugHeapPair[eName][*pairCount].nPosAllocate = asDebugHeapAllocation[eName].u32AllocatedTimesTotal;
+            (*pairCount)++;  // Increment the allocation count
+
+            asDebugHeapAllocation[eName].u32AllocatedBytesTotal += nSize;
+            asDebugHeapAllocation[eName].u32AllocatedBytesNow += nSize;
+            asDebugHeapAllocation[eName].u32AllocatedTimesTotal++;
+            asDebugHeapAllocation[eName].u32AllocatedTimesNow++;
+            if (asDebugHeapAllocation[eName].u32SingleAllocationBytesMax < nSize)
+            {
+                asDebugHeapAllocation[eName].u32SingleAllocationBytesMax = nSize;
+            }
+            if (asDebugHeapAllocation[eName].u32SingleAllocationBytesMin > nSize)
+            {
+                asDebugHeapAllocation[eName].u32SingleAllocationBytesMin = nSize;
+            }
+            
+            xSemaphoreGive(semphrDebugHeapBusy);
         }
 
     }
     else {
-        ESP_LOGV(TAG, "[ERROR] Invalid allocation input.");
+        // Free the allocation if found
+        //ESP_LOGV(TAG, "[ERROR] Invalid allocation input.");
         return;
     }
 }
@@ -99,39 +137,48 @@ void DebugHeapOnFree(e_AllocationName_t eName, void* pData)
 {
     if (pData == NULL || eName < ALLOCATION_COUNT)
     {
-        // Find the allocation in the pair array
-        uint32_t nBytes = 0;
-        size_t* pairCount = &nDebugHeapPairCount[eName];
-        for (size_t i = 0; i < *pairCount; i++) {
-            if (asDebugHeapPair[eName][i].pData == pData) {
-                nBytes = asDebugHeapPair[eName][i].nSize;
+        if (xSemaphoreTake(semphrDebugHeapBusy, SEMAPHORE_WAIT_TICKS) == pdFALSE)
+        {
+            u32DebugHeapOnFreeSkipped[eName]++;
+        }
+        else
+        {
+            // Find the allocation in the pair array
+            uint32_t nBytes = 0;
+            size_t* pairCount = &nDebugHeapPairCount[eName];
+            for (size_t i = 0; i < *pairCount; i++) {
+                if (asDebugHeapPair[eName][i].pData == pData) {
+                    nBytes = asDebugHeapPair[eName][i].nSize;
 
-                // Shift the remaining entries in the pair array
-                for (size_t j = i; j < *pairCount - 1; j++) {
-                    asDebugHeapPair[eName][j] = asDebugHeapPair[eName][j + 1];
+                    // Shift the remaining entries in the pair array
+                    for (size_t j = i; j < *pairCount - 1; j++) {
+                        asDebugHeapPair[eName][j] = asDebugHeapPair[eName][j + 1];
+                    }
+
+                    (*pairCount)--;  // Decrease the pair count
+
+                    break;
                 }
-
-                (*pairCount)--;  // Decrease the pair count
-
-                break;
             }
-        }
 
-        asDebugHeapAllocation[eName].u32FreedBytesTotal += nBytes;
-        asDebugHeapAllocation[eName].u32AllocatedBytesNow -= nBytes;
-        asDebugHeapAllocation[eName].u32FreedTimesTotal++;
-        asDebugHeapAllocation[eName].u32AllocatedTimesNow--;
-        if (asDebugHeapAllocation[eName].u32SingleFreeBytesMax < nBytes)
-        {
-            asDebugHeapAllocation[eName].u32SingleFreeBytesMax = nBytes;
-        }
-        if (asDebugHeapAllocation[eName].u32SingleFreeBytesMin > nBytes)
-        {
-            asDebugHeapAllocation[eName].u32SingleFreeBytesMin = nBytes;
+            asDebugHeapAllocation[eName].u32FreedBytesTotal += nBytes;
+            asDebugHeapAllocation[eName].u32AllocatedBytesNow -= nBytes;
+            asDebugHeapAllocation[eName].u32FreedTimesTotal++;
+            asDebugHeapAllocation[eName].u32AllocatedTimesNow--;
+            if (asDebugHeapAllocation[eName].u32SingleFreeBytesMax < nBytes)
+            {
+                asDebugHeapAllocation[eName].u32SingleFreeBytesMax = nBytes;
+            }
+            if (asDebugHeapAllocation[eName].u32SingleFreeBytesMin > nBytes)
+            {
+                asDebugHeapAllocation[eName].u32SingleFreeBytesMin = nBytes;
+            }
+            xSemaphoreGive(semphrDebugHeapBusy);
         }
     }
     else {
-        ESP_LOGV(TAG, "[ERROR] Invalid free input.");
+        // Free the allocation if found
+        //ESP_LOGV(TAG, "[ERROR] Invalid free input.");
         return;
     }
 }
@@ -139,9 +186,11 @@ void DebugHeapOnFree(e_AllocationName_t eName, void* pData)
 
 void DebugHeapOnFreeCheckAll(void* pData) {
     if (pData == NULL) {
+        // Free the allocation if found
         ESP_LOGE(TAG, "[ERROR] NULL pointer passed to DebugHeapOnFreeCheckAll.");
         return;
     }
+
 
     for (int i = 0; i < ALLOCATION_COUNT; i++) {
         size_t* pairCount = &nDebugHeapPairCount[i];
@@ -150,14 +199,15 @@ void DebugHeapOnFreeCheckAll(void* pData) {
                 // Free the allocation if found
                 DebugHeapOnFree((e_AllocationName_t)i, pData);
 
-                ESP_LOGE(TAG, "Freed allocation: Type %d, Addr: %p, Size: %u bytes", 
-                         i, pData, asDebugHeapPair[i][j].nSize);
+                //do not print here - could block forever on debug heap
+                ESP_LOGV(TAG, "Freed allocation: Type %d, Addr: %p, Size: %u bytes", i, pData, asDebugHeapPair[i][j].nSize);
 
                 return; // Exit once the allocation is found and freed
             }
         }
     }
 
+    // Free the allocation if found
     ESP_LOGE(TAG, "Pointer %p not found in any allocation type.", pData);
 }
 
@@ -169,15 +219,15 @@ void DebugHeapPrint(bool skipUnused) {
     ESP_LOGE(TAG, "\n[Heap Debugging Info]\n");
 
     // Print compact header row
-    ESP_LOGE(TAG, "--------------------------------------------------------------------");
-    ESP_LOGE(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now |");
-    ESP_LOGE(TAG, "--------------------------------------------------------------------");
+    ESP_LOGE(TAG, "------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now | A/F Fail|");
+    ESP_LOGE(TAG, "------------------------------------------------------------------------------");
 
     for (int i = 0; i < ALLOCATION_COUNT; i++) {
         s_AllocationData_t* allocData = &asDebugHeapAllocation[i];
         
         if (skipUnused == false || (int)allocData->u32SingleAllocationBytesMin >= 0)
-        ESP_LOGE(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u |",
+        ESP_LOGE(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u | %-2u/%-2u %-2u|",
                  i,
                  allocData->u32AllocatedBytesTotal,
                  allocData->u32FreedBytesTotal,
@@ -186,12 +236,18 @@ void DebugHeapPrint(bool skipUnused) {
                  (int)allocData->u32SingleAllocationBytesMin,
                  allocData->u32AllocatedTimesTotal,
                  allocData->u32FreedTimesTotal,
-                 allocData->u32AllocatedTimesNow);
+                 allocData->u32AllocatedTimesNow,
+                 u32DebugHeapOnAllocationSkipped[i],
+                 u32DebugHeapOnFreeSkipped[i],
+                 u32DebugHeapOnAllocationFail[i]
+                 );
     }
+    ESP_LOGE(TAG, "------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "nNotMonitoredMemoryFreeTimes:        %d", nNotMonitoredMemoryFreeTimes);
+    ESP_LOGE(TAG, "u32DebugHeapOnFreeSkippedCheckAll:   %d", u32DebugHeapOnFreeSkippedCheckAll);
+    ESP_LOGE(TAG, "u32OnAllocationSkipPrintfCircle:     %d", u32OnAllocationSkipPrintfCircle);
+    ESP_LOGE(TAG, "u32OnAllocationSkipPrintfQueue:      %d", u32OnAllocationSkipPrintfQueue);
 
-    ESP_LOGE(TAG, "--------------------------------------------------------------------");
-    ESP_LOGE(TAG, "nNotMonitoredMemoryFreeTimes: %d", nNotMonitoredMemoryFreeTimes);
-    
 }
 
 void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen) {
@@ -231,6 +287,14 @@ void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen) {
     ESP_LOGE(TAG, "------------------------------------------------------------------------------------------------------------------------------");
 }
 
+void DebugHeapOnAllocationSkipPrintfCircle(void)
+{
+    u32OnAllocationSkipPrintfCircle++;
+}
+void DebugHeapOnAllocationSkipPrintfQueue(void)
+{
+    u32OnAllocationSkipPrintfQueue++;
+}
 
 /* Heap Leak Debugging Final */
 
