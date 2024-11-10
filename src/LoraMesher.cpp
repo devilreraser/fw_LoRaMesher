@@ -1,5 +1,7 @@
 #include "LoraMesher.h"
 
+#include "debug_heap.h"
+
 #ifndef ARDUINO
 #include "EspHal.h"
 #endif
@@ -16,6 +18,8 @@
 #ifdef ON_RECEIVE_NOTIFY_WITH_BOOL
 bool b_on_receive_notify = false;
 #endif
+
+uint8_t dummy_buffer[256];
 
 LoraMesher::LoraMesher() {}
 
@@ -352,6 +356,8 @@ int LoraMesher::startChannelScan() {
     return state;
 }
 
+
+
 void LoraMesher::initializeSchedulers() {
     ESP_LOGV(LM_TAG, "Setting up Schedulers");
     int res;
@@ -554,49 +560,68 @@ void LoraMesher::receivingRoutine() {
             else {
                 Packet<uint8_t>* rx = PacketService::createEmptyPacket(packetSize);
 
-                rssi = (int8_t) round(radio->getRSSI());
-                snr = (int8_t) round(radio->getSNR());
+                if (rx)
+                {
+                    rssi = (int8_t) round(radio->getRSSI());
+                    snr = (int8_t) round(radio->getSNR());
 
-                ESP_LOGI(LM_TAG, "Receiving LoRa packet: Size: %d bytes RSSI: %d SNR: %d", packetSize, rssi, snr);
+                    ESP_LOGI(LM_TAG, "Receiving LoRa packet: Size: %d bytes RSSI: %d SNR: %d", packetSize, rssi, snr);
 
-                size_t max_packet_size = PacketFactory::getMaxPacketSize();
-                if (packetSize > max_packet_size) {
-                    ESP_LOGW(LM_TAG, "Received packet with size greater than MAX Packet Size");
-                    packetSize = max_packet_size;
-                }
-
-                state = radio->readData(reinterpret_cast<uint8_t*>(rx), packetSize);
-
-                if (state != RADIOLIB_ERR_NONE) {
-                    ESP_LOGW(LM_TAG, "Reading packet data gave error: %d", state);
-                    if (state == RADIOLIB_ERR_SPI_WRITE_FAILED) {
-                        ESP_LOGW(LM_TAG, "SPI Write failed, restarting radio");
-                        restartRadio();
+                    size_t max_packet_size = PacketFactory::getMaxPacketSize();
+                    if (packetSize > max_packet_size) {
+                        ESP_LOGW(LM_TAG, "Received packet with size greater than MAX Packet Size");
+                        packetSize = max_packet_size;
                     }
 
-                    // TODO: Set a count to get the number of CRC errors
-                    deletePacket(rx);
-                }
-                else if (packetSize != rx->packetSize) {
-                    ESP_LOGW(LM_TAG, "Packet size is different from the size read");
-                    deletePacket(rx);
-                }
-                else {
-                    //Create a Packet Queue element containing the Packet
-                    QueuePacket<Packet<uint8_t>>* pq = PacketQueueService::createQueuePacket(rx, 0, 0, rssi, snr);
+                    state = radio->readData(reinterpret_cast<uint8_t*>(rx), packetSize);
 
-                    //Add the Packet Queue element created into the ReceivedPackets List
-                    ReceivedPackets->Append(pq);
+                    if (state != RADIOLIB_ERR_NONE) {
+                        ESP_LOGW(LM_TAG, "Reading packet data gave error: %d", state);
+                        if (state == RADIOLIB_ERR_SPI_WRITE_FAILED) {
+                            ESP_LOGW(LM_TAG, "SPI Write failed, restarting radio");
+                            restartRadio();
+                        }
 
-                    //Notify that a packet needs to be process
-                    #ifndef DEBUG_NO_USE_RECEIVE_DATA
-                    TWres = xTaskNotifyFromISR(
-                        ReceiveData_TaskHandle,
-                        0,
-                        eSetValueWithoutOverwrite,
-                        &TWres);
-                    #endif
+                        // TODO: Set a count to get the number of CRC errors
+                        deletePacket(rx);
+                    }
+                    else if (packetSize != rx->packetSize) {
+                        ESP_LOGW(LM_TAG, "Packet size is different from the size read");
+                        deletePacket(rx);
+                    }
+                    else {
+                        //Create a Packet Queue element containing the Packet
+                        QueuePacket<Packet<uint8_t>>* pq = PacketQueueService::createQueuePacket(rx, 0, 0, rssi, snr);
+
+                        //Add the Packet Queue element created into the ReceivedPackets List
+                        ReceivedPackets->Append(pq);
+
+                        //Notify that a packet needs to be process
+                        #ifndef DEBUG_NO_USE_RECEIVE_DATA
+                        TWres = xTaskNotifyFromISR(
+                            ReceiveData_TaskHandle,
+                            0,
+                            eSetValueWithoutOverwrite,
+                            &TWres);
+                        #endif
+                    }
                 }
+                else
+                {
+                    ESP_LOGE(LM_TAG, "Fail Allocate %d bytes for read packet", packetSize);
+
+                    state = radio->readData(dummy_buffer, packetSize);
+
+                    if (state != RADIOLIB_ERR_NONE) {
+                        ESP_LOGW(LM_TAG, "Reading packet data gave error: %d", state);
+                        if (state == RADIOLIB_ERR_SPI_WRITE_FAILED) {
+                            ESP_LOGW(LM_TAG, "SPI Write failed, restarting radio");
+                            restartRadio();
+                        }
+                    }
+                }
+
+
             }
 
             startReceiving();
@@ -1609,6 +1634,8 @@ void LoraMesher::joinPacketsAndNotifyUser(listConfiguration* listConfig) {
     ESP_LOGV(LM_TAG, "Large Packet Packet length: %d Payload Size: %d", (int) packetLength, payloadSize);
 
     if (p) {
+
+        DebugHeapOnAllocation(ALLOCATION_APP_PACKET, (void*)p, packetLength);
         //Copy the payload into the packet
         unsigned long actualPayloadSizeDst = appPacketLength;
 

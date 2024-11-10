@@ -3,6 +3,7 @@
 
 #include "BuildOptions.h"
 #include "PacketHeader.h"
+#include "debug_heap.h"
 
 #pragma pack(1)
 template <typename T>
@@ -18,6 +19,7 @@ public:
      */
     void operator delete(void* p) {
         ESP_LOGV(LM_TAG, "Deleting  packet");
+        DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }
 

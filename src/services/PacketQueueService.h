@@ -8,6 +8,7 @@
 #include "utilities/LinkedQueue.hpp"
 
 #include "BuildOptions.h"
+#include "debug_heap.h"
 
 class PacketQueueService {
 public:
@@ -78,6 +79,7 @@ public:
      */
     static void deleteQueuePacketAndPacket(QueuePacket<Packet<uint8_t>>* pq) {
         ESP_LOGI(LM_TAG, "Deleting packet");
+        DebugHeapOnFreeCheckAll((void*)pq->packet);
         vPortFree(pq->packet);
 
         ESP_LOGI(LM_TAG, "Deleting packet queue");

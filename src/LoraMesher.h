@@ -1,6 +1,9 @@
 #ifndef _LORAMESHER_H
 #define _LORAMESHER_H
 
+// Debug Heap
+#include "debug_heap.h"
+
 // LoRa libraries
 #include "RadioLib.h"
 
@@ -330,6 +333,7 @@ public:
      */
     template <typename T>
     static void deletePacket(AppPacket<T>* p) {
+        DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }
 
@@ -735,6 +739,7 @@ private:
      */
     template <typename T>
     static void deletePacket(Packet<T>* p) {
+        DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }
 

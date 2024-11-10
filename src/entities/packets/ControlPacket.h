@@ -4,6 +4,8 @@
 #include "RouteDataPacket.h"
 
 #include "BuildOptions.h"
+#include "debug_heap.h"
+
 
 #pragma pack(1)
 class ControlPacket final: public RouteDataPacket {
@@ -28,6 +30,7 @@ public:
      */
     void operator delete(void* p) {
         ESP_LOGV(LM_TAG, "Deleting Control packet");
+        DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }
 };

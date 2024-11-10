@@ -3,6 +3,8 @@
 
 #include "BuildOptions.h"
 
+#include "debug_heap.h"
+
 /**
  * @brief Application packet, it is used to send the packet to the application layer
  *
@@ -51,6 +53,7 @@ public:
      */
     void operator delete(void* p) {
         ESP_LOGV(LM_TAG, "Deleting app packet");
+        DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }
 };

@@ -3,6 +3,17 @@
 
 #include "entities/packets/Packet.h"
 
+#include "debug_heap.h"
+
+typedef enum {
+    PACKET_TYPE_CREATE_ROUTING_TABLE,
+    PACKET_TYPE_CREATE_ROUTING_PACKET,
+    PACKET_TYPE_CREATE_CONTROL_PACKET,
+    PACKET_TYPE_CREATE_EMPTY_CONTROL_PACKET,
+    PACKET_TYPE_CREATE_DATA_PACKET,
+
+} ePacketType_t;
+
 class PacketFactory {
 public:
 
@@ -27,7 +38,7 @@ public:
      * @return T*
      */
     template<class T>
-    static T* createPacket(uint8_t* payload, uint8_t payloadSize) {
+    static T* createPacket(uint8_t* payload, uint8_t payloadSize, uint8_t packet_type) {
         //Packet size = size of the header + size of the payload
         size_t packetSize = sizeof(T) + payloadSize;
         size_t maxPacketSize = PacketFactory::getMaxPacketSize();
@@ -45,6 +56,29 @@ public:
             ESP_LOGE(LM_TAG, "Packet not allocated");
             return nullptr;
         }
+        switch (packet_type)
+        {
+            case PACKET_TYPE_CREATE_ROUTING_TABLE:
+                DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_ROUTING_TABLE, (void*)p, packetSize);
+                break;
+            case PACKET_TYPE_CREATE_ROUTING_PACKET:
+                DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_ROUTING_PACKET, (void*)p, packetSize);
+                break;
+            case PACKET_TYPE_CREATE_CONTROL_PACKET:
+                DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_CONTROL, (void*)p, packetSize);
+                break;
+            case PACKET_TYPE_CREATE_EMPTY_CONTROL_PACKET:
+                DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_EMPTY_CONTROL, (void*)p, packetSize);
+                break;
+            case PACKET_TYPE_CREATE_DATA_PACKET:
+                DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_DATA_PACKET, (void*)p, packetSize);
+                break;
+            default:
+                DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, (void*)p, packetSize);
+                break;
+        }
+        
+
 
         if (payloadSize > 0) {
             //Copy the payload into the packet

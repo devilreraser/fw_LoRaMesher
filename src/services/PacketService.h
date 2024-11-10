@@ -3,6 +3,8 @@
 
 #include "BuildOptions.h"
 
+#include "debug_heap.h"
+
 #include "PacketFactory.h"
 
 #include "services/RoleService.h"
@@ -91,6 +93,7 @@ public:
         Packet<uint8_t>* cpPacket = static_cast<Packet<uint8_t>*>(pvPortMalloc(packetLength));
 
         if (cpPacket) {
+            DebugHeapOnAllocation(ALLOCATION_COPY_PACKET, (void*)cpPacket, packetLength);
             memcpy(reinterpret_cast<void*>(cpPacket), reinterpret_cast<void*>(p), packetLength);
         }
         else {

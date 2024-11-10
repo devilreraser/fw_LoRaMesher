@@ -2,6 +2,7 @@
 #define _LORAMESHER_PACKET_HEADER_H
 
 #include "BuildOptions.h"
+#include "debug_heap.h"
 
 #pragma pack(1)
 class PacketHeader {
@@ -20,6 +21,7 @@ public:
      */
     void operator delete(void* p) {
         ESP_LOGV(LM_TAG, "Deleting Header packet");
+        DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }
 
