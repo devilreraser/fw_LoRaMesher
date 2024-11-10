@@ -8,7 +8,7 @@
 #include "utilities/LinkedQueue.hpp"
 
 #include "BuildOptions.h"
-#include "debug_heap.h"
+#include "debug_root.h"
 
 class PacketQueueService {
 public:

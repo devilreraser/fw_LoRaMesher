@@ -3,7 +3,7 @@
 
 #include "BuildOptions.h"
 
-#include "debug_heap.h"
+#include "debug_root.h"
 
 #include "PacketFactory.h"
 
@@ -97,6 +97,7 @@ public:
             memcpy(reinterpret_cast<void*>(cpPacket), reinterpret_cast<void*>(p), packetLength);
         }
         else {
+            DebugHeapOnAllocationFail(ALLOCATION_COPY_PACKET, packetLength);
             ESP_LOGE(LM_TAG, "Copy Packet not allocated");
             return nullptr;
         }

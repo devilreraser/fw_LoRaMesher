@@ -1,6 +1,6 @@
 #include "PacketService.h"
 
-#include "debug_heap.h"
+#include "debug_root.h"
 
 Packet<uint8_t>* PacketService::createEmptyPacket(size_t packetSize) {
     size_t maxPacketSize = PacketFactory::getMaxPacketSize();
@@ -14,6 +14,10 @@ Packet<uint8_t>* PacketService::createEmptyPacket(size_t packetSize) {
     if (p)
     {
         DebugHeapOnAllocation(ALLOCATION_EMPTY_PACK, (void*)p, packetSize);
+    }
+    else
+    {
+        DebugHeapOnAllocationFail(ALLOCATION_EMPTY_PACK, packetSize);
     }
     
 
@@ -52,6 +56,7 @@ AppPacket<uint8_t>* PacketService::createAppPacket(uint16_t dst, uint16_t src, u
         memcpy(p->payload, payload, payloadSize);
     }
     else {
+        DebugHeapOnAllocationFail(ALLOCATION_APP_PACKET_CREATE_CONVERT, packetLength);
         ESP_LOGW(LM_TAG, "User Packet not allocated");
         return nullptr;
     }

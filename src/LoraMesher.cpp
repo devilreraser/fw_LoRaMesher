@@ -1,6 +1,6 @@
 #include "LoraMesher.h"
 
-#include "debug_heap.h"
+#include "debug_root.h"
 
 #ifndef ARDUINO
 #include "EspHal.h"
@@ -502,6 +502,8 @@ void LoraMesher::helperRoutine() {
 
     for (;;) {
 
+        DebugTaskCounter(pcTaskGetName(NULL));
+
         if (b_on_receive_notify)
         {
             incHelperOnReceiveTriggerNum();
@@ -539,6 +541,9 @@ void LoraMesher::receivingRoutine() {
     int16_t state;
 
     for (;;) {
+
+        DebugTaskCounter(pcTaskGetName(NULL));
+
         TWres = xTaskNotifyWait(
             pdTRUE,
             pdFALSE,
@@ -805,6 +810,9 @@ void LoraMesher::sendPackets() {
     const uint8_t dutyCycleEvery = (100 - LM_DUTY_CYCLE) / portTICK_PERIOD_MS;
 
     for (;;) {
+
+        DebugTaskCounter(pcTaskGetName(NULL));
+
         /* Wait for the notification of new packet has to be sent and enter blocking */
         ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 
@@ -949,6 +957,9 @@ void LoraMesher::sendHelloPacketRoutine() {
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     for (;;) {
+
+        DebugTaskCounter(pcTaskGetName(NULL));
+
         ESP_LOGV(LM_TAG, "Stack space unused after entering the task hello packet: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
@@ -1017,6 +1028,9 @@ void LoraMesher::processPackets() {
     vTaskSuspend(NULL);
 
     for (;;) {
+
+        DebugTaskCounter(pcTaskGetName(NULL));
+
         ESP_LOGV(LM_TAG, "Stack space unused after entering the task processPackets: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
@@ -1097,6 +1111,9 @@ void LoraMesher::routingTableManager() {
     vTaskSuspend(NULL);
 
     for (;;) {
+
+        DebugTaskCounter(pcTaskGetName(NULL));
+
         ESP_LOGV(LM_TAG, "Routing Table Manager routine");
         ESP_LOGV(LM_TAG, "Stack space unused after entering the task routingTableManager: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
@@ -1119,6 +1136,9 @@ void LoraMesher::queueManager() {
     vTaskSuspend(NULL);
 
     for (;;) {
+
+        DebugTaskCounter(pcTaskGetName(NULL));
+
         ESP_LOGV(LM_TAG, "Stack space unused after entering the task queueManager: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
@@ -1647,6 +1667,10 @@ void LoraMesher::joinPacketsAndNotifyUser(listConfiguration* listConfig) {
             memcpy(reinterpret_cast<void*>((unsigned long) p + (actualPayloadSizeDst)), currentP->payload, actualPayloadSizeSrc);
             actualPayloadSizeDst += actualPayloadSizeSrc;
         } while (list->next());
+    }
+    else
+    {
+        DebugHeapOnAllocationFail(ALLOCATION_APP_PACKET, packetLength);
     }
 
     list->releaseInUse();

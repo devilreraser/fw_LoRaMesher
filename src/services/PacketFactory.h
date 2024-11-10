@@ -3,7 +3,7 @@
 
 #include "entities/packets/Packet.h"
 
-#include "debug_heap.h"
+#include "debug_root.h"
 
 typedef enum {
     PACKET_TYPE_CREATE_ROUTING_TABLE,
@@ -53,6 +53,27 @@ public:
         T* p = static_cast<T*>(pvPortMalloc(packetSize));
 
         if (!p) {
+            switch (packet_type)
+            {
+                case PACKET_TYPE_CREATE_ROUTING_TABLE:
+                    DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_ROUTING_TABLE, packetSize);
+                    break;
+                case PACKET_TYPE_CREATE_ROUTING_PACKET:
+                    DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_ROUTING_PACKET, packetSize);
+                    break;
+                case PACKET_TYPE_CREATE_CONTROL_PACKET:
+                    DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_CONTROL, packetSize);
+                    break;
+                case PACKET_TYPE_CREATE_EMPTY_CONTROL_PACKET:
+                    DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_EMPTY_CONTROL, packetSize);
+                    break;
+                case PACKET_TYPE_CREATE_DATA_PACKET:
+                    DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_DATA_PACKET, packetSize);
+                    break;
+                default:
+                    DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, packetSize);
+                    break;
+            }
             ESP_LOGE(LM_TAG, "Packet not allocated");
             return nullptr;
         }

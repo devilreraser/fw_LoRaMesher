@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <algorithm>
 
-#include "debug_heap.h"
+#include "debug_root.h"
 
 class BitList {
 public:
@@ -14,6 +14,7 @@ public:
         bits = static_cast<uint8_t*>(malloc(size));
         if (!bits) {
             isValid = false;  // Set a flag if allocation fails
+            DebugHeapOnAllocationFail(ALLOCATION_BIT_LIST, size);
             return;
         }
         DebugHeapOnAllocation(ALLOCATION_BIT_LIST, (void*)bits, size);

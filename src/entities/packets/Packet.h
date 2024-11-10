@@ -3,7 +3,7 @@
 
 #include "BuildOptions.h"
 #include "PacketHeader.h"
-#include "debug_heap.h"
+#include "debug_root.h"
 
 #pragma pack(1)
 template <typename T>
