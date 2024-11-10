@@ -188,4 +188,6 @@ const char* getPacketType(uint8_t type);
 // Define if is testing
 // #define LM_TESTING
 
+#define LM_GOD_MODE
+
 #endif

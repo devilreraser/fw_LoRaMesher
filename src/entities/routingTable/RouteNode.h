@@ -4,6 +4,7 @@
 #include "NetworkNode.h"
 #include "utilities/BitList.hpp"
 #include "BuildOptions.h"
+#include "debug_root.h"
 
 /**
  * @brief Route Node
@@ -101,6 +102,15 @@ public:
         received_link_quality(received_link_quality_), transmitted_link_quality(transmitted_link_quality_), receivedMetric(receivedMetric_) {
 
         bitList = new BitList(LM_QUALITY_WINDOWS_SIZE);
+        if (bitList)
+        {
+            DebugHeapOnAllocation(ALLOCATION_CREATE_ROUTE_NODE, (void*)bitList, sizeof(BitList));
+        }
+        else
+        {
+             DebugHeapOnAllocationFail(ALLOCATION_CREATE_ROUTE_NODE, sizeof(BitList));
+        }
+        
     };
 
     /**
@@ -108,6 +118,7 @@ public:
      *
      */
     ~RouteNode() {
+        DebugHeapOnFree(ALLOCATION_CREATE_ROUTE_NODE, (void*)bitList);
         delete bitList;
     };
 };

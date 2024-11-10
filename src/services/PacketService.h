@@ -93,11 +93,19 @@ public:
         Packet<uint8_t>* cpPacket = static_cast<Packet<uint8_t>*>(pvPortMalloc(packetLength));
 
         if (cpPacket) {
+            #if USE_ALLOCATION_COPY_PACKET
             DebugHeapOnAllocation(ALLOCATION_COPY_PACKET, (void*)cpPacket, packetLength);
+            #else
+            DebugHeapOnAllocationSkipCopyPacket();
+            #endif
             memcpy(reinterpret_cast<void*>(cpPacket), reinterpret_cast<void*>(p), packetLength);
         }
         else {
+            #if USE_ALLOCATION_COPY_PACKET
             DebugHeapOnAllocationFail(ALLOCATION_COPY_PACKET, packetLength);
+            #else
+            DebugHeapOnAllocationSkipCopyPacket();
+            #endif
             ESP_LOGE(LM_TAG, "Copy Packet not allocated");
             return nullptr;
         }

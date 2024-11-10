@@ -57,16 +57,32 @@ public:
             switch (packet_type)
             {
                 case PACKET_TYPE_CREATE_ROUTING_TABLE:
+                    #if USE_ALLOCATION_ROUTING_TABLE
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_ROUTING_TABLE, packetSize);
+                    #else
+                    DebugHeapOnAllocationSkipRoutingTable();
+                    #endif
                     break;
                 case PACKET_TYPE_CREATE_ROUTING_PACKET:
+                    #if USE_ALLOCATION_ROUTING_PACKET
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_ROUTING_PACKET, packetSize);
+                    #else
+                    DebugHeapOnAllocationSkipRoutingPacket();
+                    #endif
                     break;
                 case PACKET_TYPE_CREATE_CONTROL_PACKET:
+                    #if USE_ALLOCATION_CONTROL_PACKET
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_CONTROL, packetSize);
+                    #else
+                    DebugHeapOnAllocationSkipControlPacket();
+                    #endif
                     break;
                 case PACKET_TYPE_CREATE_EMPTY_CONTROL_PACKET:
+                    #if USE_ALLOCATION_CONTROL_EMPTY
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_EMPTY_CONTROL, packetSize);
+                    #else
+                    DebugHeapOnAllocationSkipControlEmpty();
+                    #endif
                     break;
                 case PACKET_TYPE_CREATE_DATA_PACKET:
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_DATA_PACKET, packetSize);
@@ -76,7 +92,11 @@ public:
                     break;
                 default:
                     ESP_LOGE(LM_TAG, "Creating packet type unknown: %d with %d bytes", packet_type, packetSize);
+                    #if USE_ALLOCATION_UNKNOWN_PACKET
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, packetSize);
+                    #else
+                    DebugHeapOnAllocationSkipUnknownPacket();
+                    #endif
                     break;
             }
             ESP_LOGE(LM_TAG, "Packet not allocated");
@@ -85,16 +105,32 @@ public:
         switch (packet_type)
         {
             case PACKET_TYPE_CREATE_ROUTING_TABLE:
+                #if USE_ALLOCATION_ROUTING_TABLE
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_ROUTING_TABLE, (void*)p, packetSize);
+                #else
+                DebugHeapOnAllocationSkipRoutingTable();
+                #endif
                 break;
             case PACKET_TYPE_CREATE_ROUTING_PACKET:
+                #if USE_ALLOCATION_ROUTING_PACKET
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_ROUTING_PACKET, (void*)p, packetSize);
+                #else
+                DebugHeapOnAllocationSkipRoutingPacket();
+                #endif
                 break;
             case PACKET_TYPE_CREATE_CONTROL_PACKET:
+                #if USE_ALLOCATION_CONTROL_PACKET
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_CONTROL, (void*)p, packetSize);
+                #else
+                DebugHeapOnAllocationSkipControlPacket();
+                #endif
                 break;
             case PACKET_TYPE_CREATE_EMPTY_CONTROL_PACKET:
+                #if USE_ALLOCATION_CONTROL_EMPTY
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_EMPTY_CONTROL, (void*)p, packetSize);
+                #else
+                DebugHeapOnAllocationSkipControlEmpty();
+                #endif
                 break;
             case PACKET_TYPE_CREATE_DATA_PACKET:
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_DATA_PACKET, (void*)p, packetSize);
@@ -104,7 +140,11 @@ public:
                 break;
             default:
                 ESP_LOGE(LM_TAG, "Creating packet type unknown: %d with %d bytes", packet_type, packetSize);
+                #if USE_ALLOCATION_UNKNOWN_PACKET
                 DebugHeapOnAllocation(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, (void*)p, packetSize);
+                #else
+                DebugHeapOnAllocationSkipUnknownPacket();
+                #endif
                 break;
         }
         

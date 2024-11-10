@@ -1654,8 +1654,11 @@ void LoraMesher::joinPacketsAndNotifyUser(listConfiguration* listConfig) {
     ESP_LOGV(LM_TAG, "Large Packet Packet length: %d Payload Size: %d", (int) packetLength, payloadSize);
 
     if (p) {
-
+        #if USE_ALLOCATION_APP_PACKET
         DebugHeapOnAllocation(ALLOCATION_APP_PACKET, (void*)p, packetLength);
+        #else
+        DebugHeapOnAllocationSkipAppPacket();
+        #endif
         //Copy the payload into the packet
         unsigned long actualPayloadSizeDst = appPacketLength;
 
@@ -1670,7 +1673,11 @@ void LoraMesher::joinPacketsAndNotifyUser(listConfiguration* listConfig) {
     }
     else
     {
+        #if USE_ALLOCATION_APP_PACKET
         DebugHeapOnAllocationFail(ALLOCATION_APP_PACKET, packetLength);
+        #else
+        DebugHeapOnAllocationSkipAppPacket();
+        #endif
     }
 
     list->releaseInUse();
