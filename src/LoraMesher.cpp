@@ -824,6 +824,7 @@ void LoraMesher::sendPackets() {
             ToSendPackets->setInUse();
 
             ESP_LOGV(LM_TAG, "Size of Send Packets Queue: %d", ToSendPackets->getLength());
+            ESP_LOGE(LM_TAG, "Size of Send Packets Queue: %d", ToSendPackets->getLength());
 
             QueuePacket<Packet<uint8_t>>* tx = ToSendPackets->Pop();
 
@@ -882,6 +883,7 @@ void LoraMesher::sendPackets() {
                 TickType_t delayBetweenSend = timeOnAir * dutyCycleEvery;
 
                 ESP_LOGV(LM_TAG, "TimeOnAir %d ms, next message in %d ms", (int) timeOnAir, (int) delayBetweenSend);
+                ESP_LOGE(LM_TAG, "TimeOnAir %d ms, next message in %d ms", (int) timeOnAir, (int) delayBetweenSend);
 
                 PacketQueueService::deleteQueuePacketAndPacket(tx);
 
