@@ -636,7 +636,7 @@ void processLedLoRaE5Indication(void*) {
 
                 case CODE_TX_MESSAGE:
                     digitalWrite(ledPin, ledOn);
-                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    vTaskDelay(500 / portTICK_PERIOD_MS);
                     digitalWrite(ledPin, ledOff);
                     vTaskDelay(500 / portTICK_PERIOD_MS);
                     break;
@@ -1432,12 +1432,14 @@ void MesherTask(void *pvParameters) {
 
 
         #if USE_AS_CONCENTRATOR
-        //Wait 5 seconds to send the next packet
-        vTaskDelay(20000 / portTICK_PERIOD_MS);
+        //Wait n seconds to send the next packet
+        //vTaskDelay(20000 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
         //delay(2000);
         #else
-        //Wait 5 seconds to send the next packet
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        //Wait n seconds to send the next packet
+        //vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
         //delay(5000);
         #endif
     }
