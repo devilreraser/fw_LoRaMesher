@@ -168,10 +168,9 @@ const char* getPacketType(uint8_t type);
 #define MIN_TIMEOUT 20
 
 //Maximum times that a sequence of packets reach the timeout
-#define MAX_TIMEOUTS 10
-#define MAX_RESEND_PACKET 3     /* for one send packets loop */
-#define MAX_TIMES_RESEND_PACKET 3     /* for this packet */
-#define MAX_TRY_BEFORE_SEND 5
+#define MAX_TIMEOUTS                10
+#define MAX_SEND_PACKET_QUEUE_SIZE  32    /* for the packet queue */
+#define MAX_TIMES_RESEND_PACKET     3     /* for this packet */
 
 // Routing Table Configuration
 #define LM_QUALITY_WINDOWS_SIZE 100 // [0, 255]

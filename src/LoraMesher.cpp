@@ -819,6 +819,9 @@ void LoraMesher::sendPackets() {
         ESP_LOGV(LM_TAG, "Stack space unused after entering the task sendPackets: %d", uxTaskGetStackHighWaterMark(NULL));
         ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
 
+        resendMessage = 0;
+
+
         while (ToSendPackets->getLength() > 0) {
 
             ToSendPackets->setInUse();
@@ -868,15 +871,16 @@ void LoraMesher::sendPackets() {
                 }
 
                 //TODO: If the packet has not been send, add it to the queue and send it again
-                if (!hasSend && resendMessage < MAX_RESEND_PACKET) {
+                if (!hasSend && tx->resend < MAX_TIMES_RESEND_PACKET && ToSendPackets->getLength() < MAX_SEND_PACKET_QUEUE_SIZE) {
                     tx->priority = MAX_PRIORITY;
+                    tx->resend++;
                     PacketQueueService::addOrdered(ToSendPackets, tx);
 
                     resendMessage++;
                     continue;
                 }
 
-                resendMessage = 0;
+                //resendMessage = 0;
 
                 uint32_t timeOnAir = radio->getTimeOnAir(tx->packet->packetSize) / 1000;
 
