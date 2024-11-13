@@ -299,6 +299,7 @@ static uint32_t u32SkippedPrintfMemMallocBytesFromCircle = 0;
 static uint32_t u32SkippedSerialQueueSendFromCircle = 0;
 
 
+static uint32_t trackConvertedPacketsToMainNum = 0;
 
 
 extern "C" int _write(int file, char *ptr, int len) {
@@ -837,6 +838,8 @@ void processReceivedPackets(void*) {
             ESP_LOGV(TAG, "ReceivedUserData_TaskHandle notify received");
             ESP_LOGV(TAG, "Queue receiveUserData size: %d", radio.getReceivedQueueSize());
 
+            trackConvertedPacketsToMainNum++;
+
             //Get the first element inside the Received User Packets Queue
             AppPacket<dataPacket>* packet = radio.getNextAppPacket<dataPacket>();
 
@@ -1321,7 +1324,7 @@ void MesherTask(void *pvParameters) {
                 //Create packet and send it.
                 radio.createPacketAndSend(id_concentrator, helloPacket, 1);
                 #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
-                sendLedLoRaE5Indication(CODE_TX_MESSAGE);
+                //sendLedLoRaE5Indication(CODE_TX_MESSAGE);
                 #endif
                 #ifdef BOARD_LED
                 uint16_t code = 0b1;  //on
@@ -1400,10 +1403,24 @@ void MesherTask(void *pvParameters) {
                 break;
             case 8:
                 radio.printAllPacketsInSendQueue(10);
-                break;
-            case 9:
                 radio.printAllPacketsInRecvQueue(10);
                 radio.printAllPacketsInDataQueue(10);
+                break;
+            case 9:
+            
+                ESP_LOGE(TAG, "??????????????????????????????????????????????????");
+                ESP_LOGE(TAG, "getReSentPackets()               %d", radio.getReSentPackets());
+                ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+                ESP_LOGE(TAG, "getSendRoutingTablePacketNum     %d", radio.getSendRoutingTablePacketNum());
+                ESP_LOGE(TAG, "getSendHelloPacketNum            %d", radio.getSendHelloPacketNum());
+                ESP_LOGE(TAG, "getSendRTRequestPacketNum        %d", radio.getSendRTRequestPacketNum());
+                ESP_LOGE(TAG, "getSendAckPacketNum              %d", radio.getSendAckPacketNum());
+                ESP_LOGE(TAG, "getSendLostPacketNum             %d", radio.getSendLostPacketNum());
+                ESP_LOGE(TAG, "getSendPacketSequenceNum         %d", radio.getSendPacketSequenceNum());
+                ESP_LOGE(TAG, "getSendAppPacketNum              %d", radio.getSendAppPacketNum());
+                ESP_LOGE(TAG, "getSendRandomTotalWait           %d ms", radio.getSendRandomTotalWait());
+
+
                 break;
             case 10:
                 ESP_LOGE(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -1421,6 +1438,11 @@ void MesherTask(void *pvParameters) {
             case 11:
                 DebugTaskPrintStats();
                 break;
+            case 12:
+                ESP_LOGE(TAG, "TrackConvertedPacketsForMeNum    %d", radio.getTrackConvertedPacketsForMeNum());
+                ESP_LOGE(TAG, "TrackConvertedPacketsNotifyNum   %d", radio.getTrackConvertedPacketsNotifyNum());
+                ESP_LOGE(TAG, "trackConvertedPacketsToMainNum   %d", trackConvertedPacketsToMainNum);
+                break;
             default:
                 printLoopState = -1;
                 break;
@@ -1434,12 +1456,14 @@ void MesherTask(void *pvParameters) {
         #if USE_AS_CONCENTRATOR
         //Wait n seconds to send the next packet
         //vTaskDelay(20000 / portTICK_PERIOD_MS);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        //vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
         //delay(2000);
         #else
         //Wait n seconds to send the next packet
         //vTaskDelay(5000 / portTICK_PERIOD_MS);
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        //vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
         //delay(5000);
         #endif
     }

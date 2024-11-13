@@ -8,7 +8,7 @@
 
 #define TAG "DBG_HEAP"
 
-#define ALLOCATION_PAIR_MAX 64
+#define ALLOCATION_PAIR_MAX 32
 
 //#define SEMAPHORE_WAIT_TICKS    pdMS_TO_TICKS(10)
 #define SEMAPHORE_WAIT_TICKS    portMAX_DELAY
@@ -42,6 +42,8 @@ size_t nNotMonitoredMemoryFreeTimes = 0;
 uint32_t u32DebugHeapOnAllocationSkipped[ALLOCATION_COUNT] = {0};
 uint32_t u32DebugHeapOnAllocationFail[ALLOCATION_COUNT] = {0};
 uint32_t u32DebugHeapOnFreeSkipped[ALLOCATION_COUNT] = {0};
+uint32_t u32DebugHeapOnAllocationSkipPair[ALLOCATION_COUNT] = {0};
+
 uint32_t u32DebugHeapOnFreeSkippedCheckAll = 0;
 
 uint32_t u32OnAllocationSkipPrintfCircle = 0;
@@ -110,6 +112,20 @@ void DebugHeapOnAllocation(e_AllocationName_t eName, void* pData, uint32_t nSize
         {
             // Get the current allocation count for this allocation name
             size_t* pairCount = &nDebugHeapPairCount[eName];
+
+            if (*pairCount >= ALLOCATION_PAIR_MAX)
+            {
+                // Remove oldest(first) and Shift the remaining entries in the pair array
+                for (size_t j = 0; j < ALLOCATION_PAIR_MAX - 1; j++) {
+                    asDebugHeapPair[eName][j] = asDebugHeapPair[eName][j + 1];
+                }
+                *pairCount = ALLOCATION_PAIR_MAX-1;
+                u32DebugHeapOnAllocationSkipPair[eName]++;
+            }
+
+
+
+
             // Add the allocation to the tracking array
             asDebugHeapPair[eName][*pairCount].pData = pData;
             asDebugHeapPair[eName][*pairCount].nSize = nSize;
@@ -226,15 +242,15 @@ void DebugHeapPrint(bool skipUnused) {
     ESP_LOGE(TAG, "\n[Heap Debugging Info]\n");
 
     // Print compact header row
-    ESP_LOGE(TAG, "------------------------------------------------------------------------------");
-    ESP_LOGE(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now | A/F Fail|");
-    ESP_LOGE(TAG, "------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "-----------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now | A/F Fail|Skip|");
+    ESP_LOGE(TAG, "-----------------------------------------------------------------------------------");
 
     for (int i = 0; i < ALLOCATION_COUNT; i++) {
         s_AllocationData_t* allocData = &asDebugHeapAllocation[i];
         
         if (skipUnused == false || (int)allocData->u32SingleAllocationBytesMin >= 0)
-        ESP_LOGE(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u | %-2u/%-2u %-2u|",
+        ESP_LOGE(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u | %-2u/%-2u %-2u| %-3u|",
                  i,
                  allocData->u32AllocatedBytesTotal,
                  allocData->u32FreedBytesTotal,
@@ -246,10 +262,11 @@ void DebugHeapPrint(bool skipUnused) {
                  allocData->u32AllocatedTimesNow,
                  u32DebugHeapOnAllocationSkipped[i],
                  u32DebugHeapOnFreeSkipped[i],
-                 u32DebugHeapOnAllocationFail[i]
+                 u32DebugHeapOnAllocationFail[i],
+                 u32DebugHeapOnAllocationSkipPair[i]
                  );
     }
-    ESP_LOGE(TAG, "------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "-----------------------------------------------------------------------------------");
     ESP_LOGE(TAG, "nNotMonitoredMemoryFreeTimes:        %d", nNotMonitoredMemoryFreeTimes);
     ESP_LOGE(TAG, "u32DebugHeapOnFreeSkippedCheckAll:   %d", u32DebugHeapOnFreeSkippedCheckAll);
     ESP_LOGE(TAG, "u32OnAllocationSkipPrintfCircle:     %d", u32OnAllocationSkipPrintfCircle);
