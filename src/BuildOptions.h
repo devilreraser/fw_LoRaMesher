@@ -4,6 +4,13 @@
 #include <stdio.h>
 
 #ifndef ESP32
+
+#include "FreeRTOS.h"
+#include "portmacro.h"
+#include "semphr.h"
+#include "task.h"
+#include "queue.h"
+
 // #define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\r\n", tag, ##__VA_ARGS__)
 // #define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\r\n", tag, ##__VA_ARGS__)
 // #define ESP_LOGI(tag, format, ...) printf("[INFO] %s: " format "\r\n", tag, ##__VA_ARGS__)
@@ -11,31 +18,31 @@
 // #define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\r\n", tag, ##__VA_ARGS__)
 
 #if CORE_DEBUG_LEVEL >= 5
-#define ESP_LOGV(tag, format, ...) printf("[VERB] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGV(tag, format, ...) printf("[%lu][VERB] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGV(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 4
-#define ESP_LOGD(tag, format, ...) printf("[DEBG] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGD(tag, format, ...) printf("[%lu][DEBG] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGD(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 3
-#define ESP_LOGI(tag, format, ...) printf("[INFO] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGI(tag, format, ...) printf("[%lu][INFO] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGI(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 2
-#define ESP_LOGW(tag, format, ...) printf("[WARN] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGW(tag, format, ...) printf("[%lu][WARN] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGW(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 1
-#define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\r\n", tag, ##__VA_ARGS__)
+#define ESP_LOGE(tag, format, ...) printf("[%lu][FAIL] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGE(tag, format, ...)
 #endif
@@ -55,11 +62,6 @@
 #endif
 
 
-#include "FreeRTOS.h"
-#include "portmacro.h"
-#include "semphr.h"
-#include "task.h"
-#include "queue.h"
 #endif
 
 #ifdef ARDUINO
@@ -171,6 +173,7 @@ const char* getPacketType(uint8_t type);
 #define MAX_TIMEOUTS                10
 #define MAX_SEND_PACKET_QUEUE_SIZE  32    /* for the packet queue */
 #define MAX_TIMES_RESEND_PACKET     3     /* for this packet */
+#define MAX_RESEND_TIMEOUT_MS       60000
 
 // Routing Table Configuration
 #define LM_QUALITY_WINDOWS_SIZE 100 // [0, 255]

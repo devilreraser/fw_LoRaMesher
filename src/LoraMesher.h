@@ -13,6 +13,7 @@
 #include "modules/LM_Modules.h"
 
 #include "utilities/LinkedQueue.hpp"
+#include "utilities/SinglePoleIIRFilter.h"
 
 #include "services/PacketService.h"
 
@@ -271,6 +272,7 @@ public:
         DataPacket* dPacket = PacketService::createDataPacket(dst, getLocalAddress(), DATA_P, reinterpret_cast<uint8_t*>(payload), payloadSizeInBytes);
 
         //Create the packet and set it to the send queue
+        incSendAppPacketNum();
         setPackedForSend(reinterpret_cast<Packet<uint8_t>*>(dPacket), DEFAULT_PRIORITY);
     }
 
@@ -471,12 +473,30 @@ public:
      */
     uint32_t getHelperOnReceiveTriggerNum() { return helperOnReceiveTriggerNum; }
 
+
+
+
     /**
      * @brief Get onReceiveEventsFlag
      *
      * @return uint32_t
      */
     uint32_t getOnReceiveEventsFlag() { return onReceiveEventsFlag; }
+
+    uint32_t getTrackConvertedPacketsForMeNum() { return trackConvertedPacketsForMeNum; }
+    uint32_t getTrackConvertedPacketsNotifyNum() { return trackConvertedPacketsNotifyNum; }
+
+    uint32_t getReSentPackets() { return u32ReSentPackets; }
+    uint32_t getSendRoutingTablePacketNum() { return u32SendRoutingTablePacketNum; }
+    uint32_t getSendHelloPacketNum() { return u32SendHelloPacketNum; }
+    uint32_t getSendRTRequestPacketNum() { return u32SendRTRequestPacketNum; }
+    uint32_t getSendAckPacketNum() { return u32SendAckPacketNum; }
+    uint32_t getSendLostPacketNum() { return u32SendLostPacketNum; }
+    uint32_t getSendPacketSequenceNum() { return u32SendPacketSequenceNum; }
+    uint32_t getSendAppPacketNum() { return u32SendAppPacketNum; }
+    uint32_t getSendRandomTotalWait() { return u32SendRandomTotalWait; }
+
+
 
     /**
      * @brief Defines that the node is a gateway. WARNING: Changing the role frequently can cause problems in the network.
@@ -724,6 +744,34 @@ private:
     uint32_t helperOnReceiveTriggerNum = 0;
     void incHelperOnReceiveTriggerNum() { helperOnReceiveTriggerNum++; }
 
+
+    uint32_t trackConvertedPacketsForMeNum = 0;
+    void incTrackConvertedPacketsForMeNum() { trackConvertedPacketsForMeNum++; }
+    uint32_t trackConvertedPacketsNotifyNum = 0;
+    void incTrackConvertedPacketsNotifyNum() { trackConvertedPacketsNotifyNum++; }
+
+    uint32_t u32ReSentPackets = 0;
+    void incReSentPackets() { u32ReSentPackets++; }
+    uint32_t u32SendRoutingTablePacketNum = 0;
+    void incSendRoutingTablePacketNum() { u32SendRoutingTablePacketNum++; }
+    uint32_t u32SendHelloPacketNum = 0;
+    void incSendHelloPacketNum() { u32SendHelloPacketNum++; }
+    uint32_t u32SendRTRequestPacketNum = 0;
+    void incSendRTRequestPacketNum() { u32SendRTRequestPacketNum++; }
+    uint32_t u32SendAckPacketNum = 0;
+    void incSendAckPacketNum() { u32SendAckPacketNum++; }
+    uint32_t u32SendLostPacketNum = 0;
+    void incSendLostPacketNum() { u32SendLostPacketNum++; }
+    uint32_t u32SendPacketSequenceNum = 0;
+    void incSendPacketSequenceNum() { u32SendPacketSequenceNum++; }
+    uint32_t u32SendAppPacketNum = 0;
+    void incSendAppPacketNum() { u32SendAppPacketNum++; }
+
+    uint32_t u32SendRandomTotalWait = 0;  // Definition and initialization
+    void incSendRandomTotalWait(uint32_t time_ms) { u32SendRandomTotalWait += time_ms; }
+
+
+
     /**
      * @brief Function that process the packets inside Received Packets
      * Task executed every time that a packet arrive.
@@ -783,8 +831,7 @@ private:
      * @param pq packet queue to be processed as data packet
      */
     void processDataPacketForMe(QueuePacket<DataPacket>* pq);
-    void processDataPacketForMeBroadcastRetransmitted(QueuePacket<DataPacket>* pq);
-
+    
     /**
      * @brief Notifies the ReceivedUserData_TaskHandle that a packet has been arrived
      *
