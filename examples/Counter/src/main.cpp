@@ -23,6 +23,9 @@
 
 #define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
 
+
+#define USE_SERIAL_PRINT_SEMPHR 0
+
 /* Comment/Comment out Following */
 //#define DEBUG_USE_BLINK_TASK
 
@@ -118,6 +121,8 @@ struct dataPacket {
 dataPacket* helloPacket = new dataPacket;
 
 static uint32_t u32HeardOurPackets = 0;
+static uint32_t u32NonBroadcastPackets = 0;
+static uint32_t u32BroadcastPackets = 0;
 
 
 
@@ -280,8 +285,10 @@ bool CircularQueue_Dequeue(CircularQueue *queue, void **item) {
 #define QUEUE_LENGTH 128
 
 static QueueHandle_t serialQueue = NULL;
-static SemaphoreHandle_t serialSemaphore = NULL;
 
+#if USE_SERIAL_PRINT_SEMPHR
+static SemaphoreHandle_t serialSemaphore = NULL;
+#endif
 
 
 
@@ -337,6 +344,7 @@ extern "C" int _write(int file, char *ptr, int len) {
             u32SkippedPrintfMemMallocBytes += len;
             return -1;
         }
+        DebugHeapAllocateCount((void*)buffer, copyLen + 1);
         #if USE_ALLOCATION_PRINTF_QUEUE
         DebugHeapOnAllocation(ALLOCATION_PRINTF_QUEUE, (void*)buffer, copyLen + 1);
         #else
@@ -357,6 +365,7 @@ extern "C" int _write(int file, char *ptr, int len) {
             u32SkippedPrintfCirMallocBytes += len;
             return -1;
         }
+        DebugHeapAllocateCount((void*)buffer, copyLen + 1);
         #if USE_ALLOCATION_PRINTF_CIRCLE
         DebugHeapOnAllocation(ALLOCATION_PRINTF_CIRCLE, (void*)buffer, copyLen + 1);
         #else
@@ -387,6 +396,7 @@ extern "C" int _write(int file, char *ptr, int len) {
                     // Handle memory allocation failure
                     u32SkippedPrintfMemMallocFromCircle++;
                     u32SkippedPrintfMemMallocBytesFromCircle += len;
+                    DebugHeapFreeCount((void*)bufferCopyOld);
                     #if USE_ALLOCATION_PRINTF_CIRCLE
                     DebugHeapOnFree(ALLOCATION_PRINTF_CIRCLE, (void*)bufferCopyOld);
                     #endif
@@ -394,6 +404,7 @@ extern "C" int _write(int file, char *ptr, int len) {
                 }
                 else
                 {
+                    DebugHeapAllocateCount((void*)bufferCopyNew, copyLenLoop + 1);
                     #if USE_ALLOCATION_PRINTF_QUEUE
                     DebugHeapOnAllocation(ALLOCATION_PRINTF_QUEUE, (void*)bufferCopyNew, copyLenLoop + 1);
                     #else
@@ -401,12 +412,14 @@ extern "C" int _write(int file, char *ptr, int len) {
                     #endif
                     memcpy(bufferCopyNew, bufferCopyOld, copyLenLoop);
                     bufferCopyNew[copyLenLoop] = '\0';
+                    DebugHeapFreeCount((void*)bufferCopyOld);
                     #if USE_ALLOCATION_PRINTF_CIRCLE
                     DebugHeapOnFree(ALLOCATION_PRINTF_CIRCLE, (void*)bufferCopyOld);
                     #endif
                     circular_free(&buffer_uart_printf, bufferCopyOld);
                     if (xQueueSend(serialQueue, &bufferCopyNew, SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS) != pdPASS) {
                         u32SkippedSerialQueueSendFromCircle++;
+                        DebugHeapFreeCount((void*)bufferCopyNew);
                         #if USE_ALLOCATION_PRINTF_QUEUE
                         DebugHeapOnFree(ALLOCATION_PRINTF_QUEUE, (void*)bufferCopyNew);
                         #endif
@@ -418,6 +431,7 @@ extern "C" int _write(int file, char *ptr, int len) {
 
         if (xQueueSend(serialQueue, &buffer, SERIAL_PRINTF_WAIT_QUEUE_SEND_TICKS) != pdPASS) {
             u32SkippedSerialQueueSend++;
+            DebugHeapFreeCount((void*)buffer);
             #if USE_ALLOCATION_PRINTF_QUEUE
             DebugHeapOnFree(ALLOCATION_PRINTF_QUEUE, (void*)buffer);
             #endif
@@ -429,6 +443,7 @@ extern "C" int _write(int file, char *ptr, int len) {
     {
         if (CircularQueue_Enqueue(&circularQueue, buffer) != pdPASS) {
             u32SkippedCircleQueueSend++;
+            DebugHeapFreeCount((void*)buffer);
             #if USE_ALLOCATION_PRINTF_CIRCLE
             DebugHeapOnFree(ALLOCATION_PRINTF_CIRCLE, (void*)buffer);
             #endif
@@ -447,27 +462,34 @@ void serialTask(void *pvParameters) {
 
 
     // Create the semaphore for UART print access
+    #if USE_SERIAL_PRINT_SEMPHR
     serialSemaphore = xSemaphoreCreateMutex();
     if (serialSemaphore == NULL) {
         Serial.println("Error creating serial print semaphore.");
         vTaskDelete(NULL);
         return;
     }
+    #endif
 
     Serial.print("serialTask entered\r\n");
 
+    #if USE_SERIAL_PRINT_SEMPHR
     xSemaphoreGive(serialSemaphore);
+    #endif
     printf("printf through queue Test Message\r\n");
 
     #define LOOPS_PRINT_SERIAL_TASK_STACK  32
     int print_stack_counter = LOOPS_PRINT_SERIAL_TASK_STACK;
+    int print_alive_timeout = pdMS_TO_TICKS(10000);
+    int print_alive_counter = pdMS_TO_TICKS(10000);
+    int queue_receive_ticks = pdMS_TO_TICKS(100);
 
     for (;;) {
 
         DebugTaskCounter(pcTaskGetName(NULL));
 
         // Wait for a message to be available
-        if (xQueueReceive(serialQueue, &msg, portMAX_DELAY) == pdPASS) 
+        if (xQueueReceive(serialQueue, &msg, queue_receive_ticks) == pdPASS) 
         {
             print_stack_counter++;
             if (print_stack_counter >= LOOPS_PRINT_SERIAL_TASK_STACK)
@@ -478,16 +500,31 @@ void serialTask(void *pvParameters) {
             }
 
             // Output the message
+            #if USE_SERIAL_PRINT_SEMPHR
             if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
+            #endif
                 Serial.print(msg);
+            #if USE_SERIAL_PRINT_SEMPHR
                 xSemaphoreGive(serialSemaphore);
             }
+            #endif
 
             // Free the allocated memory
+            DebugHeapFreeCount((void*)msg);
             #if USE_ALLOCATION_PRINTF_QUEUE
             DebugHeapOnFree(ALLOCATION_PRINTF_QUEUE, (void*)msg);
             #endif
             vPortFree(msg);
+            print_alive_counter = 0;
+        }
+        else
+        {
+            print_alive_counter += queue_receive_ticks;
+
+            if (print_alive_counter >= print_alive_timeout)
+            {
+                Serial.print("serialTask Idles\r\n");
+            }
         }
 
     }
@@ -860,17 +897,19 @@ void processReceivedPackets(void*) {
                 u32HeardOurPackets++;
                 isUnique = false;
             }
+            else
             // Check if the packet is a broadcast message when endpoint
             #if USE_AS_CONCENTRATOR == 0
             if (packet->dst != BROADCAST_ADDR) 
             {
+                u32NonBroadcastPackets++;
                 isUnique = true;
                 //to do remove duplicated if is concentrator and not broadcast because could come from several endpoints re-transmitted
-
             }
             else
             #endif
             {
+                u32BroadcastPackets++;
                 // Flag to track if the payload is unique
                 isUnique = true;
 
@@ -1390,8 +1429,11 @@ void MesherTask(void *pvParameters) {
                 printTaskList();
                 break;
             case 6:
-                ESP_LOGE(TAG, "u32HeardOurPackets   %d", u32HeardOurPackets);
-                ESP_LOGE(TAG, "Free heap:           %d", getFreeHeap());
+                ESP_LOGE(TAG, "u32HeardOurPackets       %d", u32HeardOurPackets);
+                ESP_LOGE(TAG, "u32BroadcastPackets      %d", u32BroadcastPackets);
+                ESP_LOGE(TAG, "u32NonBroadcastPackets   %d", u32NonBroadcastPackets);
+                ESP_LOGE(TAG, "DebugHeapTimesGet        %d", DebugHeapTimesGet());
+                ESP_LOGE(TAG, "Free heap:               %d", getFreeHeap());
                 break;
             case 7:
                 if (printDetailsLoopState >= ALLOCATION_COUNT)

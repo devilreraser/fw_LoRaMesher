@@ -1,0 +1,33 @@
+{
+    "cortex-debug.gdbPath": "C:/Users/DLilov/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gdb.exe",
+    "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink_V810g/JLinkGDBServer.exe",
+    "cortex-debug.stutilPath": "C:/repo/stlink-1.8.0-win32/bin/st-util.exe",
+    //"cortex-debug.stutilPath": "C:/repo/stlink-1.7.0-x86_64-w64-mingw32/bin/st-util.exe",
+    "idf.portWin": "COM20",
+    "files.associations": {
+        "array": "cpp",
+        "*.tcc": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "memory": "cpp",
+        "random": "cpp",
+        "initializer_list": "cpp",
+        "istream": "cpp",
+        "functional": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp",
+        "cstdint": "cpp",
+        "new": "cpp",
+        "semaphore": "cpp",
+        "stdexcept": "cpp",
+        "compare": "cpp",
+        "mutex": "cpp",
+        "algorithm": "cpp",
+        "stdint.h": "c",
+        "task.h": "c"
+    }
+}

@@ -10,7 +10,7 @@
 
 #define ALLOCATION_PAIR_MAX 32
 
-//#define SEMAPHORE_WAIT_TICKS    pdMS_TO_TICKS(10)
+//#define SEMAPHORE_WAIT_TICKS    pdMS_TO_TICKS(100)
 #define SEMAPHORE_WAIT_TICKS    portMAX_DELAY
 //#define SEMAPHORE_WAIT_TICKS    0
 
@@ -55,11 +55,33 @@ uint32_t u32OnAllocationSkipRoutingPacket = 0;
 uint32_t u32OnAllocationSkipControlPacket = 0;
 uint32_t u32OnAllocationSkipControlEmpty = 0;
 uint32_t u32OnAllocationSkipUnknownPacket = 0;
+uint32_t u32OnFreePairNotFound = 0;
 
 
+static uint32_t u32AllocatedMemoryBytes = 0;
+static uint32_t u3FreedMemoryBytes = 0;
+static uint32_t u32AllocatedMemoryTiumes = 0;
+static uint32_t u3FreedMemoryTimes = 0;
 
 
 SemaphoreHandle_t semphrDebugHeapBusy = NULL;
+
+void DebugHeapAllocateCount(void* pData, size_t nSize)
+{
+    u32AllocatedMemoryTiumes++;
+}
+
+void DebugHeapFreeCount(void* pData)
+{
+    u3FreedMemoryTimes++;
+}
+
+int DebugHeapTimesGet(void)
+{
+    return u32AllocatedMemoryTiumes - u3FreedMemoryTimes;
+}
+
+#if USE_DEBUG_HEAP
 
 void DebugHeapInit(void)
 {
@@ -230,6 +252,8 @@ void DebugHeapOnFreeCheckAll(void* pData) {
         }
     }
 
+    u32OnFreePairNotFound++;
+
     // Free the allocation if found
     ESP_LOGE(TAG, "Pointer %p not found in any allocation type.", pData);
 }
@@ -242,15 +266,15 @@ void DebugHeapPrint(bool skipUnused) {
     ESP_LOGE(TAG, "\n[Heap Debugging Info]\n");
 
     // Print compact header row
-    ESP_LOGE(TAG, "-----------------------------------------------------------------------------------");
-    ESP_LOGE(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now | A/F Fail|Skip|");
-    ESP_LOGE(TAG, "-----------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "---------------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now | A/F Fail|Skip|Cnt|");
+    ESP_LOGE(TAG, "---------------------------------------------------------------------------------------");
 
     for (int i = 0; i < ALLOCATION_COUNT; i++) {
         s_AllocationData_t* allocData = &asDebugHeapAllocation[i];
         
         if (skipUnused == false || (int)allocData->u32SingleAllocationBytesMin >= 0)
-        ESP_LOGE(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u | %-2u/%-2u %-2u| %-3u|",
+        ESP_LOGE(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u | %-2u/%-2u %-2u| %-3u|%-3u|",
                  i,
                  allocData->u32AllocatedBytesTotal,
                  allocData->u32FreedBytesTotal,
@@ -263,10 +287,11 @@ void DebugHeapPrint(bool skipUnused) {
                  u32DebugHeapOnAllocationSkipped[i],
                  u32DebugHeapOnFreeSkipped[i],
                  u32DebugHeapOnAllocationFail[i],
-                 u32DebugHeapOnAllocationSkipPair[i]
+                 u32DebugHeapOnAllocationSkipPair[i],
+                nDebugHeapPairCount[i]
                  );
     }
-    ESP_LOGE(TAG, "-----------------------------------------------------------------------------------");
+    ESP_LOGE(TAG, "---------------------------------------------------------------------------------------");
     ESP_LOGE(TAG, "nNotMonitoredMemoryFreeTimes:        %d", nNotMonitoredMemoryFreeTimes);
     ESP_LOGE(TAG, "u32DebugHeapOnFreeSkippedCheckAll:   %d", u32DebugHeapOnFreeSkippedCheckAll);
     ESP_LOGE(TAG, "u32OnAllocationSkipPrintfCircle:     %d", u32OnAllocationSkipPrintfCircle);
@@ -278,6 +303,7 @@ void DebugHeapPrint(bool skipUnused) {
     ESP_LOGE(TAG, "u32OnAllocationSkipControlPacket:    %d", u32OnAllocationSkipControlPacket);
     ESP_LOGE(TAG, "u32OnAllocationSkipControlEmpty:     %d", u32OnAllocationSkipControlEmpty);
     ESP_LOGE(TAG, "u32OnAllocationSkipUnknownPacket:    %d", u32OnAllocationSkipUnknownPacket);
+    ESP_LOGE(TAG, "u32OnFreePairNotFound:               %d", u32OnFreePairNotFound);
     
 }
 
@@ -293,26 +319,34 @@ void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen) {
     ESP_LOGE(TAG, "| Address  | Len | Pos | 00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 ... |");
     ESP_LOGE(TAG, "------------------------------------------------------------------------------------------------------------------------------");
 
-    // Loop through active allocation pairs for the given type
-    for (size_t j = 0; j < nDebugHeapPairCount[eName]; j++) {
-        void* pData = asDebugHeapPair[eName][j].pData;
-        uint8_t* byteData = (uint8_t*)(pData);
-        uint32_t nSize = asDebugHeapPair[eName][j].nSize;
-        size_t printLen = (nSize < maxDataLen) ? nSize : maxDataLen;
+    if (xSemaphoreTake(semphrDebugHeapBusy, SEMAPHORE_WAIT_TICKS) == pdFALSE)
+    {
+        //u32DebugHeapPrintSkipped[eName]++;
+    }
+    else
+    {
+        // Loop through active allocation pairs for the given type
+        for (size_t j = 0; j < nDebugHeapPairCount[eName]; j++) {
+            void* pData = asDebugHeapPair[eName][j].pData;
+            uint8_t* byteData = (uint8_t*)(pData);
+            uint32_t nSize = asDebugHeapPair[eName][j].nSize;
+            size_t printLen = (nSize < maxDataLen) ? nSize : maxDataLen;
 
-        // Prepare the data string
-        char dataBuffer[128] = {0};  // Buffer for 32 bytes (formatted as "XX ") plus null terminator
-        size_t pos = 0;
-        for (size_t k = 0; k < printLen && pos < sizeof(dataBuffer) - 3; k++) {
-            pos += snprintf(&dataBuffer[pos], sizeof(dataBuffer) - pos, "%02X ", byteData[k]);
+            // Prepare the data string
+            char dataBuffer[128] = {0};  // Buffer for 32 bytes (formatted as "XX ") plus null terminator
+            size_t pos = 0;
+            for (size_t k = 0; k < printLen && pos < sizeof(dataBuffer) - 3; k++) {
+                pos += snprintf(&dataBuffer[pos], sizeof(dataBuffer) - pos, "%02X ", byteData[k]);
+            }
+
+            if (printLen < nSize) {
+                snprintf(&dataBuffer[pos], sizeof(dataBuffer) - pos, "...");
+            }
+
+            // Print the formatted line for the allocation
+            ESP_LOGE(TAG, "| %08X | %-3u | %-3u | %-99s |", (uintptr_t)pData, nSize, asDebugHeapPair[eName][j].nPosAllocate, dataBuffer);
         }
-
-        if (printLen < nSize) {
-            snprintf(&dataBuffer[pos], sizeof(dataBuffer) - pos, "...");
-        }
-
-        // Print the formatted line for the allocation
-        ESP_LOGE(TAG, "| %08X | %-3u | %-3u | %-99s |", (uintptr_t)pData, nSize, asDebugHeapPair[eName][j].nPosAllocate, dataBuffer);
+        xSemaphoreGive(semphrDebugHeapBusy);
     }
 
     ESP_LOGE(TAG, "------------------------------------------------------------------------------------------------------------------------------");
@@ -362,5 +396,7 @@ void DebugHeapOnAllocationSkipUnknownPacket(void)
     u32OnAllocationSkipUnknownPacket++;
 }
 
+
+#endif  /* #if USE_DEBUG_HEAP */
 /* Heap Leak Debugging Final */
 

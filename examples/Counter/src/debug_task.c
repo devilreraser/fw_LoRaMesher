@@ -83,9 +83,9 @@ void DebugTaskPrintStats() {
         xSemaphoreTake(counterMutex, portMAX_DELAY);
 
         ESP_LOGE(TAG, "\n[Task Loop Stats]");
-        ESP_LOGE(TAG, "-----------------------------------------------");
+        ESP_LOGE(TAG, "-----------------------------------------");
         ESP_LOGE(TAG, "| Task Name       | Loop Count | Diff   |");
-        ESP_LOGE(TAG, "-----------------------------------------------");
+        ESP_LOGE(TAG, "-----------------------------------------");
 
         for (int i = 0; i < MAX_TASKS; i++) {
             if (taskLoopCounters[i].taskName[0] != '\0') {
@@ -98,7 +98,7 @@ void DebugTaskPrintStats() {
             }
         }
 
-        ESP_LOGE(TAG, "-----------------------------------------------");
+        ESP_LOGE(TAG, "-----------------------------------------");
 
         xSemaphoreGive(counterMutex);
     }

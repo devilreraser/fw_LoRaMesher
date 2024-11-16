@@ -6,7 +6,10 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
+
+#define USE_DEBUG_HEAP                  0
 
 #define USE_ALLOCATION_PRINTF_CIRCLE    0
 #define USE_ALLOCATION_PRINTF_QUEUE     0
@@ -59,6 +62,12 @@ typedef enum {
 
 
 
+void DebugHeapAllocateCount(void* pData, size_t nSize);
+void DebugHeapFreeCount(void* pData);
+int DebugHeapTimesGet(void);
+
+#if USE_DEBUG_HEAP
+
 void DebugHeapInit(void);
 void DebugHeapOnAllocationFail(e_AllocationName_t eName, uint32_t nSize);
 void DebugHeapOnAllocation(e_AllocationName_t eName, void* pData, uint32_t nSize);
@@ -75,6 +84,27 @@ void DebugHeapOnAllocationSkipRoutingPacket(void);
 void DebugHeapOnAllocationSkipControlPacket(void);
 void DebugHeapOnAllocationSkipControlEmpty(void);
 void DebugHeapOnAllocationSkipUnknownPacket(void);
+
+#else
+
+inline void DebugHeapInit(void) {}
+inline void DebugHeapOnAllocationFail(e_AllocationName_t, uint32_t) {}
+inline void DebugHeapOnAllocation(e_AllocationName_t, void*, uint32_t) {}
+inline void DebugHeapOnFree(e_AllocationName_t, void*) {}
+inline void DebugHeapOnFreeCheckAll(void*) {}
+inline void DebugHeapPrint(bool) {}
+inline void DebugHeapPrintPears(e_AllocationName_t, uint32_t) {}
+inline void DebugHeapOnAllocationSkipPrintfCircle(void) {}
+inline void DebugHeapOnAllocationSkipPrintfQueue(void) {}
+inline void DebugHeapOnAllocationSkipAppPacket(void) {}
+inline void DebugHeapOnAllocationSkipCopyPacket(void) {}
+inline void DebugHeapOnAllocationSkipRoutingTable(void) {}
+inline void DebugHeapOnAllocationSkipRoutingPacket(void) {}
+inline void DebugHeapOnAllocationSkipControlPacket(void) {}
+inline void DebugHeapOnAllocationSkipControlEmpty(void) {}
+inline void DebugHeapOnAllocationSkipUnknownPacket(void) {}
+
+#endif
 
 #ifdef __cplusplus
 }
