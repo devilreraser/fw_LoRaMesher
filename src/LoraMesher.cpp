@@ -1727,6 +1727,7 @@ void LoraMesher::joinPacketsAndNotifyUser(listConfiguration* listConfig) {
     ESP_LOGV(LM_TAG, "Large Packet Packet length: %d Payload Size: %d", (int) packetLength, payloadSize);
 
     if (p) {
+        DebugHeapAllocateCount((void*)p, packetLength);
         #if USE_ALLOCATION_APP_PACKET
         DebugHeapOnAllocation(ALLOCATION_APP_PACKET, (void*)p, packetLength);
         #else

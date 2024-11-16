@@ -40,6 +40,7 @@ public:
     void DeleteCurrent();
     bool next();
     bool moveToStart();
+    bool moveToEnd();
     bool prev();
     void Clear();
     void setInUse();
@@ -211,6 +212,11 @@ bool LM_LinkedList<T>::moveToStart() {
     return length != 0;
 }
 
+template <class T>
+bool LM_LinkedList<T>::moveToEnd() {
+    curr = tail;
+    return length != 0;
+}
 template<class T>
 bool LM_LinkedList<T>::prev() {
     if (length == 0)

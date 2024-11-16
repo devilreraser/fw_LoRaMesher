@@ -17,6 +17,7 @@ public:
             DebugHeapOnAllocationFail(ALLOCATION_BIT_LIST, size);
             return;
         }
+        DebugHeapAllocateCount((void*)bits, size);
         DebugHeapOnAllocation(ALLOCATION_BIT_LIST, (void*)bits, size);
         std::fill(bits, bits + size, 0);
     }
@@ -24,6 +25,7 @@ public:
     ~BitList() {
         if (bits) 
         {
+            DebugHeapFreeCount((void*)bits);
             DebugHeapOnFree(ALLOCATION_BIT_LIST, (void*)bits);
             free(bits);
         }

@@ -102,6 +102,9 @@ public:
             ESP_LOGE(LM_TAG, "Packet not allocated");
             return nullptr;
         }
+
+        DebugHeapAllocateCount((void*)p, packetSize);
+        
         switch (packet_type)
         {
             case PACKET_TYPE_CREATE_ROUTING_TABLE:

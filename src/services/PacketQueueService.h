@@ -79,6 +79,7 @@ public:
      */
     static void deleteQueuePacketAndPacket(QueuePacket<Packet<uint8_t>>* pq) {
         ESP_LOGI(LM_TAG, "Deleting packet");
+        DebugHeapFreeCount((void*)pq->packet);
         DebugHeapOnFreeCheckAll((void*)pq->packet);
         vPortFree(pq->packet);
 

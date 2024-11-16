@@ -18,6 +18,7 @@ public:
      */
     void operator delete(void* p) {
         ESP_LOGV(LM_TAG, "Deleting Data packet");
+        DebugHeapFreeCount((void*)p);
         DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }

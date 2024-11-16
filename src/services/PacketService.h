@@ -93,6 +93,7 @@ public:
         Packet<uint8_t>* cpPacket = static_cast<Packet<uint8_t>*>(pvPortMalloc(packetLength));
 
         if (cpPacket) {
+            DebugHeapAllocateCount((void*)cpPacket, packetLength);
             #if USE_ALLOCATION_COPY_PACKET
             DebugHeapOnAllocation(ALLOCATION_COPY_PACKET, (void*)cpPacket, packetLength);
             #else

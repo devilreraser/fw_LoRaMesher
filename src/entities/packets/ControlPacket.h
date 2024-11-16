@@ -30,6 +30,7 @@ public:
      */
     void operator delete(void* p) {
         ESP_LOGV(LM_TAG, "Deleting Control packet");
+        DebugHeapFreeCount((void*)p);
         DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }

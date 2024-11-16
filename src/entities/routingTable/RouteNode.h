@@ -104,6 +104,7 @@ public:
         bitList = new BitList(LM_QUALITY_WINDOWS_SIZE);
         if (bitList)
         {
+            DebugHeapAllocateCount((void*)bitList, sizeof(BitList));
             DebugHeapOnAllocation(ALLOCATION_CREATE_ROUTE_NODE, (void*)bitList, sizeof(BitList));
         }
         else
@@ -118,6 +119,7 @@ public:
      *
      */
     ~RouteNode() {
+        DebugHeapFreeCount((void*)bitList);
         DebugHeapOnFree(ALLOCATION_CREATE_ROUTE_NODE, (void*)bitList);
         delete bitList;
     };

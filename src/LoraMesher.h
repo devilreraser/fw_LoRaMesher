@@ -335,6 +335,7 @@ public:
      */
     template <typename T>
     static void deletePacket(AppPacket<T>* p) {
+        DebugHeapFreeCount((void*)p);
         DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }
@@ -787,6 +788,7 @@ private:
      */
     template <typename T>
     static void deletePacket(Packet<T>* p) {
+        DebugHeapFreeCount((void*)p);
         DebugHeapOnFreeCheckAll((void*)p);
         vPortFree(p);
     }

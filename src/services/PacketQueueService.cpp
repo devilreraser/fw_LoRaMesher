@@ -18,6 +18,16 @@ void PacketQueueService::addOrdered(LM_LinkedList<QueuePacket<Packet<uint8_t>>>*
 
     list->Append(qp);
 
+    bool noLimitLength = (list->getLength() < MAX_SEND_PACKET_QUEUE_SIZE);  /* used only for send packets */
+
+    if (noLimitLength == false)
+    {
+        list->moveToEnd();
+        QueuePacket<Packet<uint8_t>>* current = list->getCurrent();
+        PacketQueueService::deleteQueuePacketAndPacket(current);
+        list->DeleteCurrent();
+    }
+
     list->releaseInUse();
 }
 

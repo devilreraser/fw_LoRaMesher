@@ -13,6 +13,7 @@ Packet<uint8_t>* PacketService::createEmptyPacket(size_t packetSize) {
 
     if (p)
     {
+        DebugHeapAllocateCount((void*)p, packetSize);
         DebugHeapOnAllocation(ALLOCATION_EMPTY_PACK, (void*)p, packetSize);
     }
     else
@@ -51,6 +52,7 @@ AppPacket<uint8_t>* PacketService::createAppPacket(uint16_t dst, uint16_t src, u
     AppPacket<uint8_t>* p = static_cast<AppPacket<uint8_t>*>(pvPortMalloc(packetLength));
 
     if (p) {
+        DebugHeapAllocateCount((void*)p, packetLength);
         DebugHeapOnAllocation(ALLOCATION_APP_PACKET_CREATE_CONVERT, (void*)p, packetLength);
         //Copy the payload into the packet
         memcpy(p->payload, payload, payloadSize);
