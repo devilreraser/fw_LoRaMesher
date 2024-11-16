@@ -130,6 +130,10 @@ static uint32_t u32BroadcastPackets = 0;
 std::vector<dataPacket> previousBroadcastPayloads;
 const size_t maxBroadcastPayloads = 32; //256 bytes 32 payloads
 
+void printTaskList(void);
+
+
+int printLoopState = 0;
 
 
 
@@ -456,10 +460,65 @@ extern "C" int _write(int file, char *ptr, int len) {
     return len;  // Return the number of characters written
 }
 
+
+void processCommand(String command) {
+    if (command == "print tasks") {
+        printLoopState = 0;
+        Serial.print("Executing command: ");
+        Serial.println(command);
+        printTaskList();
+    } else 
+    if (command == "p0") {
+        printLoopState = 0;
+        Serial.print("Executing command: ");
+        Serial.println(command);
+    } else 
+    if (command == "p1") {
+        printLoopState = 1;
+        Serial.print("Executing command: ");
+        Serial.println(command);
+    } else 
+    if (command == "p2") {
+        printLoopState = 2;
+        Serial.print("Executing command: ");
+        Serial.println(command);
+    } else 
+    if (command.startsWith("p")) {
+        String print_state = command.substring(1);  // Extract value after "p"
+        if (print_state == "3")
+        {
+            printLoopState = 3;
+            Serial.print("Executing command: ");
+            Serial.println(command);
+        }
+        else
+        {
+            int loop_state = print_state.toInt();
+            if (loop_state >= 0)
+            {
+                printLoopState = loop_state;
+                Serial.print("Executing command: ");
+                Serial.println(command);
+
+            }
+            else
+            {
+                Serial.print("Unimplemented command: ");
+                Serial.println(command);
+            }
+        }
+    } else {
+        Serial.print("Unknown command: ");
+        Serial.println(command);
+    }
+}
+
+
 void serialTask(void *pvParameters) {
     char *msg;
 
 
+    String command = "";  // Buffer to store the current command
 
     // Create the semaphore for UART print access
     #if USE_SERIAL_PRINT_SEMPHR
@@ -527,6 +586,38 @@ void serialTask(void *pvParameters) {
             }
         }
 
+
+        if (Serial.available() > 0) {
+            char c = Serial.read();  // Read the first character
+            Serial.print(c);         // Echo the character back
+            command += c;            // Start building the command
+
+            // Enter blocking mode until '\n' is received
+            while ((c != '\r') && (c != '\n')) {
+                if (Serial.available() > 0) {
+                    c = Serial.read();  // Read next character
+                    Serial.print(c);    // Echo each character in real-time
+                    command += c;       // Add to command buffer
+                }
+            }
+
+            // Command is complete, process it
+            command.trim();  // Remove any leading/trailing whitespace
+            Serial.println(command);
+            // Drain the queue after processing the command
+            while (xQueueReceive(serialQueue, &msg, 0) == pdPASS) {
+                // Free the allocated memory
+                DebugHeapFreeCount((void*)msg);
+                #if USE_ALLOCATION_PRINTF_QUEUE
+                DebugHeapOnFree(ALLOCATION_PRINTF_QUEUE, (void*)msg);
+                #endif
+                vPortFree(msg);  // Free any remaining messages in the queue
+            }
+            processCommand(command);
+            command = "";  // Clear the command buffer for the next input
+        }
+
+
     }
 }
 
@@ -536,7 +627,8 @@ void serialTask(void *pvParameters) {
 
 void printTaskList() {
     // Allocate a buffer for task list
-    const size_t bufferSize = 1024;  // Adjust size if necessary
+    //const size_t bufferSize = 1024;  // Adjust size if necessary
+    const size_t bufferSize = (uxTaskGetNumberOfTasks() + 5) * sizeof( TaskStatus_t );  // Adjust size if necessary
     char* taskListBuffer = (char*)pvPortMalloc(bufferSize);
     
     if (taskListBuffer == NULL) {
@@ -757,7 +849,7 @@ void initLedLoRaE5Indication(void)
 
 
 void printRouteNode(RouteNode* routeNode) {
-    printf("Destination: %04X | Metric: %3d | Next Hop (via): %04X | Hop Count: %04d | Rx SNR: %3d | Tx SNR: %3d | Rx RSSI: %3d | Tx RSSI: %3d | SRTT: %3d | RTTVAR: %3d | Rx Metric: %3d\r\n"
+    printf("Dst:%04X|Metric:%3d|HopVia:%04X|HopCnt:%04d|Rx SNR:%3d|Tx SNR:%3d|RxRSSI:%3d|TxRSSI:%3d|SRTT:%3d|RTTVAR:%3d|RxMetric:%3d\r\n"
         , routeNode->networkNode.address    // Destination node address in hexadecimal
         , routeNode->networkNode.metric     // Metric associated with this route
         , routeNode->via                    // Next hop address in hexadecimal
@@ -1296,8 +1388,6 @@ void printSubGHzInterruptPriority() {
 void MesherTask(void *pvParameters) {
     // This replaces the `loop()` function with main Mesher Function
 
-    int printLoopState = 0;
-
     int printDetailsLoopState = 0;
 
     #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
@@ -1380,118 +1470,123 @@ void MesherTask(void *pvParameters) {
             }
         }
 
-        ESP_LOGE(TAG, "---!%-3d!---", printLoopState);
-        switch (printLoopState)
+        if (printLoopState)
         {
-            case 0:
-                printRoutingTable();
-                break;
-            case 1:
-                ESP_LOGE(TAG, "routingTableSize                 %d", radio.routingTableSize());
-                ESP_LOGE(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
-                ESP_LOGE(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
-                ESP_LOGE(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
-                ESP_LOGE(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
-                ESP_LOGE(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
-                ESP_LOGE(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
-                ESP_LOGE(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
-                ESP_LOGE(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
-                ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
-                ESP_LOGE(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
-                ESP_LOGE(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
-                ESP_LOGE(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
-                ESP_LOGE(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
-                ESP_LOGE(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
-                ESP_LOGE(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
-                ESP_LOGE(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
-                ESP_LOGE(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
-                break;
-            case 2:
-                ESP_LOGE(TAG, "getOnReceiveEventsCounter                %d", radio.getOnReceiveEventsCounter());
-                ESP_LOGE(TAG, "u32SkippedPrintfMemMalloc                %d", u32SkippedPrintfMemMalloc);
-                ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytes           %d", u32SkippedPrintfMemMallocBytes);
-                ESP_LOGE(TAG, "u32SkippedSerialQueueSend                %d", u32SkippedSerialQueueSend);
-                ESP_LOGE(TAG, "u32PrintfReceiveEventFlag                %d", u32PrintfReceiveEventFlag);
-                ESP_LOGE(TAG, "u32SkippedPrintfCirMalloc                %d", u32SkippedPrintfCirMalloc);
-                ESP_LOGE(TAG, "u32SkippedPrintfCirMallocBytes           %d", u32SkippedPrintfCirMallocBytes);
-                ESP_LOGE(TAG, "u32SkippedCircleQueueSend                %d", u32SkippedCircleQueueSend);
-                ESP_LOGE(TAG, "u32SkippedPrintfMemMallocFromCircle      %d", u32SkippedPrintfMemMallocFromCircle);
-                ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytesFromCircle %d", u32SkippedPrintfMemMallocBytesFromCircle);
-                ESP_LOGE(TAG, "u32SkippedSerialQueueSendFromCircle      %d", u32SkippedSerialQueueSendFromCircle);
-                break;
-            case 3:
-                DebugHeapPrint(true);
-                break;
-            case 4:
-                printSubGHzInterruptPriority();
-                break;
-            case 5:
-                printTaskList();
-                break;
-            case 6:
-                ESP_LOGE(TAG, "u32HeardOurPackets       %d", u32HeardOurPackets);
-                ESP_LOGE(TAG, "u32BroadcastPackets      %d", u32BroadcastPackets);
-                ESP_LOGE(TAG, "u32NonBroadcastPackets   %d", u32NonBroadcastPackets);
-                ESP_LOGE(TAG, "DebugHeapTimesGet        %d", DebugHeapTimesGet());
-                ESP_LOGE(TAG, "Free heap:               %d", getFreeHeap());
-                break;
-            case 7:
-                if (printDetailsLoopState >= ALLOCATION_COUNT)
-                {
-                    printDetailsLoopState = 0;
-                }
-                DebugHeapPrintPears((e_AllocationName_t)printDetailsLoopState, 32);
-                printDetailsLoopState++;
-                break;
-            case 8:
-                radio.printAllPacketsInSendQueue(10);
-                radio.printAllPacketsInRecvQueue(10);
-                radio.printAllPacketsInDataQueue(10);
-                break;
-            case 9:
-            
-                ESP_LOGE(TAG, "??????????????????????????????????????????????????");
-                ESP_LOGE(TAG, "getReSentPackets()               %d", radio.getReSentPackets());
-                ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
-                ESP_LOGE(TAG, "getSendRoutingTablePacketNum     %d", radio.getSendRoutingTablePacketNum());
-                ESP_LOGE(TAG, "getSendHelloPacketNum            %d", radio.getSendHelloPacketNum());
-                ESP_LOGE(TAG, "getSendRTRequestPacketNum        %d", radio.getSendRTRequestPacketNum());
-                ESP_LOGE(TAG, "getSendAckPacketNum              %d", radio.getSendAckPacketNum());
-                ESP_LOGE(TAG, "getSendLostPacketNum             %d", radio.getSendLostPacketNum());
-                ESP_LOGE(TAG, "getSendPacketSequenceNum         %d", radio.getSendPacketSequenceNum());
-                ESP_LOGE(TAG, "getSendAppPacketNum              %d", radio.getSendAppPacketNum());
-                ESP_LOGE(TAG, "getSendRandomTotalWait           %d ms", radio.getSendRandomTotalWait());
+
+            ESP_LOGE(TAG, "---!%-3d!---", printLoopState);
+            switch (printLoopState)
+            {
+                case 1:
+                    printRoutingTable();
+                    break;
+                case 2:
+                    ESP_LOGE(TAG, "routingTableSize                 %d", radio.routingTableSize());
+                    ESP_LOGE(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
+                    ESP_LOGE(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
+                    ESP_LOGE(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
+                    ESP_LOGE(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
+                    ESP_LOGE(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
+                    ESP_LOGE(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
+                    ESP_LOGE(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
+                    ESP_LOGE(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
+                    ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+                    ESP_LOGE(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
+                    ESP_LOGE(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
+                    ESP_LOGE(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
+                    ESP_LOGE(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
+                    ESP_LOGE(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
+                    ESP_LOGE(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
+                    ESP_LOGE(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
+                    ESP_LOGE(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
+                    break;
+                case 3:
+                    ESP_LOGE(TAG, "u32HeardOurPackets       %d", u32HeardOurPackets);
+                    ESP_LOGE(TAG, "u32BroadcastPackets      %d", u32BroadcastPackets);
+                    ESP_LOGE(TAG, "u32NonBroadcastPackets   %d", u32NonBroadcastPackets);
+                    ESP_LOGE(TAG, "DebugHeapTimesGet        %d", DebugHeapTimesGet());
+                    ESP_LOGE(TAG, "Free heap:               %d", getFreeHeap());
+                    ESP_LOGE(TAG, "getOnReceiveEventsCounter                %d", radio.getOnReceiveEventsCounter());
+                    ESP_LOGE(TAG, "u32SkippedPrintfMemMalloc                %d", u32SkippedPrintfMemMalloc);
+                    ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytes           %d", u32SkippedPrintfMemMallocBytes);
+                    ESP_LOGE(TAG, "u32SkippedSerialQueueSend                %d", u32SkippedSerialQueueSend);
+                    ESP_LOGE(TAG, "u32PrintfReceiveEventFlag                %d", u32PrintfReceiveEventFlag);
+                    ESP_LOGE(TAG, "u32SkippedPrintfCirMalloc                %d", u32SkippedPrintfCirMalloc);
+                    ESP_LOGE(TAG, "u32SkippedPrintfCirMallocBytes           %d", u32SkippedPrintfCirMallocBytes);
+                    ESP_LOGE(TAG, "u32SkippedCircleQueueSend                %d", u32SkippedCircleQueueSend);
+                    ESP_LOGE(TAG, "u32SkippedPrintfMemMallocFromCircle      %d", u32SkippedPrintfMemMallocFromCircle);
+                    ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytesFromCircle %d", u32SkippedPrintfMemMallocBytesFromCircle);
+                    ESP_LOGE(TAG, "u32SkippedSerialQueueSendFromCircle      %d", u32SkippedSerialQueueSendFromCircle);
+                    break;
+                case 4:
+                    printSubGHzInterruptPriority();
+                    break;
+                case 5:
+                    printTaskList();
+                    break;
+                case 6:
+                    DebugHeapPrint(true);
+                    break;
+                case 7:
+                    if (printDetailsLoopState >= ALLOCATION_COUNT)
+                    {
+                        printDetailsLoopState = 0;
+                    }
+                    DebugHeapPrintPears((e_AllocationName_t)printDetailsLoopState, 32);
+                    printDetailsLoopState++;
+                    break;
+                case 8:
+                    radio.printAllPacketsInSendQueue(10);
+                    radio.printAllPacketsInRecvQueue(10);
+                    radio.printAllPacketsInDataQueue(10);
+                    break;
+                case 9:
+                
+                    ESP_LOGE(TAG, "??????????????????????????????????????????????????");
+                    ESP_LOGE(TAG, "getReSentPackets()               %d", radio.getReSentPackets());
+                    ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+                    ESP_LOGE(TAG, "getSendRoutingTablePacketNum     %d", radio.getSendRoutingTablePacketNum());
+                    ESP_LOGE(TAG, "getSendHelloPacketNum            %d", radio.getSendHelloPacketNum());
+                    ESP_LOGE(TAG, "getSendRTRequestPacketNum        %d", radio.getSendRTRequestPacketNum());
+                    ESP_LOGE(TAG, "getSendAckPacketNum              %d", radio.getSendAckPacketNum());
+                    ESP_LOGE(TAG, "getSendLostPacketNum             %d", radio.getSendLostPacketNum());
+                    ESP_LOGE(TAG, "getSendPacketSequenceNum         %d", radio.getSendPacketSequenceNum());
+                    ESP_LOGE(TAG, "getSendAppPacketNum              %d", radio.getSendAppPacketNum());
+                    ESP_LOGE(TAG, "getSendRandomTotalWait           %d ms", radio.getSendRandomTotalWait());
 
 
-                break;
-            case 10:
-                ESP_LOGE(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                ESP_LOGE(TAG, "previousBroadcastPayloads.size()         %d", previousBroadcastPayloads.size());
-                ESP_LOGE(TAG, "radio.routingTableSize()                 %d", radio.routingTableSize());
-                ESP_LOGE(TAG, "radio.q_WSP->getLength()                 %d", radio.q_WSP->getLength());
-                ESP_LOGE(TAG, "radio.q_WRP->getLength()                 %d", radio.q_WRP->getLength());
-                ESP_LOGE(TAG, "radio.ReceivedAppPackets->getLength()    %d", radio.ReceivedAppPackets->getLength());
-                ESP_LOGE(TAG, "radio.ReceivedPackets->getLength()       %d", radio.ReceivedPackets->getLength());
-                ESP_LOGE(TAG, "radio.ToSendPackets->getLength()         %d", radio.ToSendPackets->getLength());
-                ESP_LOGE(TAG, "routingTableList->getLength()            %d", RoutingTableService::routingTableList->getLength());
+                    break;
+                case 10:
+                    ESP_LOGE(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    ESP_LOGE(TAG, "previousBroadcastPayloads.size()         %d", previousBroadcastPayloads.size());
+                    ESP_LOGE(TAG, "radio.routingTableSize()                 %d", radio.routingTableSize());
+                    ESP_LOGE(TAG, "radio.q_WSP->getLength()                 %d", radio.q_WSP->getLength());
+                    ESP_LOGE(TAG, "radio.q_WRP->getLength()                 %d", radio.q_WRP->getLength());
+                    ESP_LOGE(TAG, "radio.ReceivedAppPackets->getLength()    %d", radio.ReceivedAppPackets->getLength());
+                    ESP_LOGE(TAG, "radio.ReceivedPackets->getLength()       %d", radio.ReceivedPackets->getLength());
+                    ESP_LOGE(TAG, "radio.ToSendPackets->getLength()         %d", radio.ToSendPackets->getLength());
+                    ESP_LOGE(TAG, "routingTableList->getLength()            %d", RoutingTableService::routingTableList->getLength());
 
-                break;
+                    break;
 
-            case 11:
-                DebugTaskPrintStats();
-                break;
-            case 12:
-                ESP_LOGE(TAG, "TrackConvertedPacketsForMeNum    %d", radio.getTrackConvertedPacketsForMeNum());
-                ESP_LOGE(TAG, "TrackConvertedPacketsNotifyNum   %d", radio.getTrackConvertedPacketsNotifyNum());
-                ESP_LOGE(TAG, "trackConvertedPacketsToMainNum   %d", trackConvertedPacketsToMainNum);
-                break;
-            default:
-                printLoopState = -1;
-                break;
+                case 11:
+                    DebugTaskPrintStats();
+                    break;
+                case 12:
+                    ESP_LOGE(TAG, "TrackConvertedPacketsForMeNum    %d", radio.getTrackConvertedPacketsForMeNum());
+                    ESP_LOGE(TAG, "TrackConvertedPacketsNotifyNum   %d", radio.getTrackConvertedPacketsNotifyNum());
+                    ESP_LOGE(TAG, "trackConvertedPacketsToMainNum   %d", trackConvertedPacketsToMainNum);
+                    break;
+                default:
+                    printLoopState = -1;
+                    break;
+            }
+            ESP_LOGE(TAG, "---!END!---");
+
+
+
+            printLoopState = 0;
         }
-        ESP_LOGE(TAG, "---!END!---");
 
-        printLoopState++;
 
 
 
@@ -1659,13 +1754,13 @@ void setup() {
 
 void loop() {
 
-    // for (;;) {
+    for (;;) {
 
-    //     printf("[loop printf] Loop: %d ms\r\n", millis());  // Print elapsed time in milliseconds
-    //     printf("[loop printf] portTICK_PERIOD_MS: %d\r\n", portTICK_PERIOD_MS);
-    //     printf("[loop printf] configTICK_RATE_HZ: %d\r\n", configTICK_RATE_HZ);
-    //     printf("[loop printf] configCPU_CLOCK_HZ: %d\r\n", configCPU_CLOCK_HZ);
-    //     delay(5000);
-    // }
+        printf("[loop printf] Loop: %d ms\r\n", millis());  // Print elapsed time in milliseconds
+        printf("[loop printf] portTICK_PERIOD_MS: %d\r\n", portTICK_PERIOD_MS);
+        printf("[loop printf] configTICK_RATE_HZ: %d\r\n", configTICK_RATE_HZ);
+        printf("[loop printf] configCPU_CLOCK_HZ: %d\r\n", configCPU_CLOCK_HZ);
+        delay(5000);
+    }
     return;
 }
