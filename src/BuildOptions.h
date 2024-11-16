@@ -18,31 +18,31 @@
 // #define ESP_LOGE(tag, format, ...) printf("[FAIL] %s: " format "\r\n", tag, ##__VA_ARGS__)
 
 #if CORE_DEBUG_LEVEL >= 5
-#define ESP_LOGV(tag, format, ...) printf("[%lu][VERB] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
+#define ESP_LOGV(tag, format, ...) printf("[%lu][VERBOSE] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGV(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 4
-#define ESP_LOGD(tag, format, ...) printf("[%lu][DEBG] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
+#define ESP_LOGD(tag, format, ...) printf("[%lu][DEBUG  ] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGD(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 3
-#define ESP_LOGI(tag, format, ...) printf("[%lu][INFO] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
+#define ESP_LOGI(tag, format, ...) printf("[%lu][INFO   ] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGI(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 2
-#define ESP_LOGW(tag, format, ...) printf("[%lu][WARN] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
+#define ESP_LOGW(tag, format, ...) printf("[%lu][WARNING] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGW(tag, format, ...)
 #endif
 
 #if CORE_DEBUG_LEVEL >= 1
-#define ESP_LOGE(tag, format, ...) printf("[%lu][FAIL] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
+#define ESP_LOGE(tag, format, ...) printf("[%lu][FAILURE] %s: " format "\r\n", xTaskGetTickCount(), tag, ##__VA_ARGS__)
 #else
 #define ESP_LOGE(tag, format, ...)
 #endif
@@ -108,6 +108,7 @@ long random(long howsmall, long howbig);
 
 size_t getFreeHeap();
 
+extern const char* RT_TAG;
 extern const char* LM_TAG;
 extern const char* LM_VERSION;
 

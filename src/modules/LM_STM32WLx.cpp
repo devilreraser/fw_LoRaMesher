@@ -10,6 +10,10 @@ LM_STM32WLx::LM_STM32WLx(STM32WLx_Module* mod) {
 }
 #endif
 
+LM_STM32WLx::~LM_STM32WLx() {
+    delete module;  // Clean up allocated memory, if necessary
+}
+
 void LM_STM32WLx::setRfSwitchTable(const uint32_t (&pins)[Module::RFSWITCH_MAX_PINS], const Module::RfSwitchMode_t table[]) {
     module->setRfSwitchTable(pins, table);
 }

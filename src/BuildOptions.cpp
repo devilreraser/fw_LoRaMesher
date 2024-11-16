@@ -1,5 +1,6 @@
 #include "BuildOptions.h"
 
+const char* RT_TAG = "RouteTable";
 const char* LM_TAG = "LoRaMesher";
 const char* LM_VERSION = "0.0.8";
 

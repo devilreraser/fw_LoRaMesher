@@ -5,11 +5,13 @@
 
 class LM_STM32WLx : public LM_Module {
 public:
+
 #ifdef ARDUINO
     LM_STM32WLx(); // No arguments needed for STM32WLx module in Arduino
 #else
     LM_STM32WLx(STM32WLx_Module* module);
 #endif
+    virtual ~LM_STM32WLx();  // Explicitly declare the virtual destructor
 
     void setRfSwitchTable(const uint32_t (&pins)[Module::RFSWITCH_MAX_PINS], const Module::RfSwitchMode_t table[]) override;
     // Initialization
