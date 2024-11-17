@@ -1,6 +1,7 @@
 {
     "cortex-debug.gdbPath": "C:/Users/DLilov/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gdb.exe",
-    "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink_V810g/JLinkGDBServer.exe",
+    //"cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink_V810g/JLinkGDBServer.exe",
+    "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink_V794e/JLinkGDBServer.exe",
     "cortex-debug.stutilPath": "C:/repo/stlink-1.8.0-win32/bin/st-util.exe",
     //"cortex-debug.stutilPath": "C:/repo/stlink-1.7.0-x86_64-w64-mingw32/bin/st-util.exe",
     "idf.portWin": "COM20",

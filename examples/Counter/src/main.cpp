@@ -26,6 +26,39 @@
 
 #define USE_SERIAL_PRINT_SEMPHR 0
 
+
+
+/*
+ * Concatenate preprocessor tokens A and B without expanding macro definitions
+ * (however, if invoked from a macro, macro arguments are expanded).
+ */
+#define PPCAT_NX(A, B) A ## B
+
+/*
+ * Concatenate preprocessor tokens A and B after macro-expanding them.
+ */
+#define PPCAT(A, B) PPCAT_NX(A, B)
+
+/*
+ * Turn A into a string literal without expanding macro definitions
+ * (however, if invoked from a macro, macro arguments are expanded).
+ */
+#define STRINGIZE_NX(A) #A
+
+/*
+ * Turn A into a string literal after macro-expanding it.
+ */
+#define STRINGIZE(A) STRINGIZE_NX(A)
+
+
+
+#ifndef BUILD_VERSION
+#define BUILD_VERSION_STRING "undefined"
+#else
+#define BUILD_VERSION_STRING STRINGIZE(BUILD_VERSION)
+#endif
+
+
 /* Comment/Comment out Following */
 //#define DEBUG_USE_BLINK_TASK
 
@@ -134,8 +167,12 @@ void printTaskList(void);
 
 
 int printLoopState = 0;
+uint32_t u32LoopTaskCounter = 0;
 
 
+void print_version() {
+    printf("Firmware Version: %s\r\n", BUILD_VERSION_STRING);
+}
 
 /* circular buffer begin */
 #include <stdbool.h>
@@ -514,6 +551,7 @@ void processCommand(String command) {
 }
 
 
+
 void serialTask(void *pvParameters) {
     char *msg;
 
@@ -801,7 +839,7 @@ void createLedLoRaE5Indication() {
     int res = xTaskCreate(
         processLedLoRaE5Indication,
         "Led LoRa E5 Indication Task",
-        256,
+        256 + 256,
         (void*) 1,
         2,
         &ledLoRaE5Indication_Handle);
@@ -1134,7 +1172,7 @@ void createReceiveMessages() {
     int res = xTaskCreate(
         processReceivedPackets,
         "Receive App Task",
-        512,
+        512 + 512,
         (void*) 1,
         2,
         &receiveLoRaMessage_Handle);
@@ -1384,7 +1422,6 @@ void printSubGHzInterruptPriority() {
 }
 
 
-
 void MesherTask(void *pvParameters) {
     // This replaces the `loop()` function with main Mesher Function
 
@@ -1404,6 +1441,7 @@ void MesherTask(void *pvParameters) {
 
 
     bool concentrator = USE_AS_CONCENTRATOR;
+    print_version();
     printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
     printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
     for (;;) {
@@ -1500,12 +1538,13 @@ void MesherTask(void *pvParameters) {
                     ESP_LOGE(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
                     break;
                 case 3:
-                    ESP_LOGE(TAG, "u32HeardOurPackets       %d", u32HeardOurPackets);
-                    ESP_LOGE(TAG, "u32BroadcastPackets      %d", u32BroadcastPackets);
-                    ESP_LOGE(TAG, "u32NonBroadcastPackets   %d", u32NonBroadcastPackets);
-                    ESP_LOGE(TAG, "DebugHeapTimesGet        %d", DebugHeapTimesGet());
-                    ESP_LOGE(TAG, "Free heap:               %d", getFreeHeap());
+                    ESP_LOGE(TAG, "u32LoopTaskCounter                       %d", u32LoopTaskCounter);
+                    ESP_LOGE(TAG, "DebugHeapTimesGet                        %d", DebugHeapTimesGet());
+                    ESP_LOGE(TAG, "Free heap:                               %d", getFreeHeap());
                     ESP_LOGE(TAG, "getOnReceiveEventsCounter                %d", radio.getOnReceiveEventsCounter());
+                    ESP_LOGE(TAG, "u32HeardOurPackets                       %d", u32HeardOurPackets);
+                    ESP_LOGE(TAG, "u32BroadcastPackets                      %d", u32BroadcastPackets);
+                    ESP_LOGE(TAG, "u32NonBroadcastPackets                   %d", u32NonBroadcastPackets);
                     ESP_LOGE(TAG, "u32SkippedPrintfMemMalloc                %d", u32SkippedPrintfMemMalloc);
                     ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytes           %d", u32SkippedPrintfMemMallocBytes);
                     ESP_LOGE(TAG, "u32SkippedSerialQueueSend                %d", u32SkippedSerialQueueSend);
@@ -1617,10 +1656,16 @@ void setup() {
     while (!Serial);      // Wait for Serial to initialize
     Serial.println("");
     Serial.println("");
+    Serial.println("");
+    Serial.println("");
+    Serial.println("");
+    Serial.print("Firmware Version: ");
+    Serial.println(BUILD_VERSION_STRING);
+    Serial.print("ConcentratorRole: ");
+    Serial.println(USE_AS_CONCENTRATOR?"TRUE":"FALSE");
+    Serial.print("Device NetworkID: 0x");
+    Serial.println(radio.getLocalAddress(),HEX);
     Serial.println("UART Initialized.");
-
-
-
 
     // Create the queue
     serialQueue = xQueueCreate(QUEUE_LENGTH, sizeof(char *));
@@ -1632,14 +1677,14 @@ void setup() {
     Serial.print("serialQueue created\r\n");
 
     // Create task for printf -> Serial handling
-    res = xTaskCreate(serialTask,"SerialTask", 256, NULL, 1, NULL);
+    res = xTaskCreate(serialTask,"SerialTask", 256 + 256, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "SerialTask creation gave error: %d", res);
     }
 
     //Create task for LED blinking handling
     #ifdef DEBUG_USE_BLINK_TASK
-    res = xTaskCreate(blinkTask, "Blink Task", 128, NULL, 1, NULL);
+    res = xTaskCreate(blinkTask, "Blink Task", 128 + 128, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "Blink Task creation gave error: %d", res);
     }
@@ -1738,7 +1783,7 @@ void setup() {
     #endif
 
     // Create task for printf -> Serial handling
-    res = xTaskCreate(MesherTask,"MesherTask",512, NULL, 1, NULL);
+    res = xTaskCreate(MesherTask,"MesherTask",512 + 512, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "MesherTask creation gave error: %d", res);
     }
@@ -1752,15 +1797,16 @@ void setup() {
 
 }
 
+
 void loop() {
 
     for (;;) {
-
-        printf("[loop printf] Loop: %d ms\r\n", millis());  // Print elapsed time in milliseconds
-        printf("[loop printf] portTICK_PERIOD_MS: %d\r\n", portTICK_PERIOD_MS);
-        printf("[loop printf] configTICK_RATE_HZ: %d\r\n", configTICK_RATE_HZ);
-        printf("[loop printf] configCPU_CLOCK_HZ: %d\r\n", configCPU_CLOCK_HZ);
-        delay(5000);
+        u32LoopTaskCounter++;
+        //printf("[loop printf] Loop: %d ms\r\n", millis());  // Print elapsed time in milliseconds
+        //printf("[loop printf] portTICK_PERIOD_MS: %d\r\n", portTICK_PERIOD_MS);
+        //printf("[loop printf] configTICK_RATE_HZ: %d\r\n", configTICK_RATE_HZ);
+        //printf("[loop printf] configCPU_CLOCK_HZ: %d\r\n", configCPU_CLOCK_HZ);
+        delay(1000);
     }
     return;
 }
