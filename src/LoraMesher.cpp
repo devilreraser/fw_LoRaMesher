@@ -20,6 +20,13 @@
 bool b_on_receive_notify = false;
 #endif
 
+
+const char* PP_TAG = "ProcPackets";
+
+uint32_t processPacketsState = 0;
+uint32_t processPacketsLoop = 0;
+uint32_t processPacketsLoopLast = 0;
+
 uint8_t dummy_buffer[256];
 
 LoraMesher::LoraMesher() {}
@@ -367,7 +374,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->helperRoutine(); },
         "Helper routine",
-        256,
+        256 + 256,
         this,
         6,
         &Helper_TaskHandle);
@@ -380,7 +387,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        512,
+        512 + 512,  //for sure with 512 blocks
         this,
         6,
         &ReceivePacket_TaskHandle);
@@ -391,7 +398,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendPackets(); },
         "Sending routine",
-        256,
+        256 + 256,
         this,
         5,
         &SendData_TaskHandle);
@@ -401,7 +408,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendHelloPacketRoutine(); },
         "Hello routine",
-        256,
+        256 + 256,
         this,
         4,
         &Hello_TaskHandle);
@@ -412,7 +419,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->processPackets(); },
         "Process routine",
-        512,
+        512 + 512,
         this,
         3,
         &ReceiveData_TaskHandle);
@@ -424,7 +431,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->routingTableManager(); },
         "Routing Table Manager routine",
-        512,
+        512 + 512,
         this,
         2,
         &RoutingTableManager_TaskHandle);
@@ -436,7 +443,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->queueManager(); },
         "Queue Manager routine",
-        512,
+        512 + 512,
         this,
         2,
         &QueueManager_TaskHandle);
@@ -822,7 +829,7 @@ bool LoraMesher::sendPacket(Packet<uint8_t>* p) {
     clearDioActions();
 
     // Print the packet to be sent
-    printHeaderPacket(p, "send");
+    printHeaderPacket(LM_TAG, p, "TX");
 
     //Blocking transmit, it is necessary due to deleting the packet after sending it. 
     int resT = radio->transmit(reinterpret_cast<uint8_t*>(p), p->packetSize);
@@ -1098,88 +1105,154 @@ void LoraMesher::sendHelloPacket() {
     RoutingTableService::clearAllHelloPacketsNode(node);
 }
 
+
+
 void LoraMesher::processPackets() {
-    ESP_LOGV(LM_TAG, "Process routine started");
+    ESP_LOGV(PP_TAG, "Process routine started");
     vTaskSuspend(NULL);
+
+    processPacketsState = 1;
 
     for (;;) {
 
+        processPacketsLoop = 0;
+
+        processPacketsState = 2;
         DebugTaskCounter(pcTaskGetName(NULL));
 
-        ESP_LOGV(LM_TAG, "Stack space unused after entering the task processPackets: %d", uxTaskGetStackHighWaterMark(NULL));
-        ESP_LOGV(LM_TAG, "Free heap: %d", getFreeHeap());
+        processPacketsState = 3;
+        ESP_LOGV(PP_TAG, "Stack space unused after entering the task processPackets: %d", uxTaskGetStackHighWaterMark(NULL));
+        ESP_LOGV(PP_TAG, "Free heap: %d", getFreeHeap());
 
+        processPacketsState = 4;
         /* Wait for the notification of receivingRoutine and enter blocking */
         ulTaskNotifyTake(pdPASS, portMAX_DELAY);
 
-        ESP_LOGV(LM_TAG, "Size of Received Packets Queue: %d", ReceivedPackets->getLength());
+        processPacketsState = 5;
+        ESP_LOGV(PP_TAG, "Size of Received Packets Queue: %d", ReceivedPackets->getLength());
 
-        while (ReceivedPackets->getLength() > 0) {
+        processPacketsState = 6;
+
+        while (ReceivedPackets->getLength() > 0) 
+        {
+            ESP_LOGV(PP_TAG, "Processing packet index %d of %d packets", processPacketsLoop, ReceivedPackets->getLength());
+            processPacketsState = 7;
             QueuePacket<Packet<uint8_t>>* rx = ReceivedPackets->Pop();
 
-            if (rx) {
+            processPacketsState = 8;
+
+            if (rx) 
+            {
+                processPacketsState = 9;
                 uint8_t type = rx->packet->type;
 
 #ifdef LM_TESTING
                 if (!shouldProcessPacket(rx->packet)) {
                     PacketQueueService::deleteQueuePacketAndPacket(rx);
-                    ESP_LOGV(LM_TAG, "TESTING: Packet not for me, deleting it");
+                    ESP_LOGV(PP_TAG, "TESTING: Packet not for me, deleting it");
                     continue;
                 }
 #endif
+                ESP_LOGV(PP_TAG, "Procesing packet ReceivedPackets->Pop() ok");
+                printHeaderPacket(PP_TAG, rx->packet, "RX");
 
-                printHeaderPacket(rx->packet, "received");
-
-
+                processPacketsState = 10;
                 recordState(LM_StateType::STATE_TYPE_RECEIVED, rx->packet);
 
                 incReceivedPayloadBytes(PacketService::getPacketPayloadLengthWithoutControl(rx->packet));
                 incReceivedControlBytes(PacketService::getControlLength(rx->packet));
 
-
-                if (PacketService::isRoutingTablePacket(type)) {
+                processPacketsState = 11;
+                if (PacketService::isRoutingTablePacket(type)) 
+                {
+                    ESP_LOGV(PP_TAG, "Received Routing Table Packet");
                     incReceivedRoutingTablePackets();
+                    processPacketsState = 12;
 
                     bool needSendHelloPacket = RoutingTableService::processRoute(reinterpret_cast<RoutePacket*>(rx->packet), rx->snr);
+                    processPacketsState = 13;
                     PacketQueueService::deleteQueuePacketAndPacket(rx);
-
+                    processPacketsState = 14;
                     if (needSendHelloPacket)
+                    {
+                        ESP_LOGV(PP_TAG, "needSendHelloPacket (processRoute)");
+                        processPacketsState = 15;
                         sendHelloPacket();
-
+                    }
+                        
+                    processPacketsState = 16;
                 }
-                else if (PacketService::isHelloPacket(type)) {
+                else if (PacketService::isHelloPacket(type)) 
+                {
+                    ESP_LOGV(PP_TAG, "Received HelloPacket ok");
+                    processPacketsState = 17;
                     incRecHelloPackets();
 
                     HelloPacket* hello_p = reinterpret_cast<HelloPacket*>(rx->packet);
+                    processPacketsState = 18;
 
                     Packet<uint8_t>* send_packet = nullptr;
+                    processPacketsState = 19;
                     bool needSendHelloPacket = RoutingTableService::processHelloPacket(reinterpret_cast<HelloPacket*>(rx->packet), rx->snr, &send_packet);
+                    processPacketsState = 20;
                     PacketQueueService::deleteQueuePacketAndPacket(rx);
+                    processPacketsState = 21;
 
-                    if (send_packet != nullptr) {
+                    if (send_packet != nullptr) 
+                    {
+                        ESP_LOGV(PP_TAG, "send_packet != nullptr ok");
+                        processPacketsState = 22;
+
                         //Ask for the updated routing table
                         incSendRTRequestPacketNum();
+                        processPacketsState = 23;
                         setPackedForSend(send_packet, DEFAULT_PRIORITY);
+                        processPacketsState = 24;
                     }
-                    else if (needSendHelloPacket) {
+                    else if (needSendHelloPacket) 
+                    {
+                        ESP_LOGV(PP_TAG, "needSendHelloPacket (processHelloPacket)");
+                        processPacketsState = 25;
                         sendHelloPacket();
+                        processPacketsState = 26;
                     }
                 }
-                else if (PacketService::isRoutingTableRequestPacket(type)) {
-                    ESP_LOGV(LM_TAG, "Received Routing Table Request Packet");
+                else if (PacketService::isRoutingTableRequestPacket(type)) 
+                {
+                    ESP_LOGV(PP_TAG, "Received Routing Table Request Packet");
+                    processPacketsState = 27;
                     if (rx->packet->dst == getLocalAddress())
+                    {
+                        processPacketsState = 28;
                         sendRoutingTablePacket();
+                        processPacketsState = 29;
+                    }
+                    processPacketsState = 30;
+                        
                     PacketQueueService::deleteQueuePacketAndPacket(rx);
+                    processPacketsState = 31;
                 }
                 else if (PacketService::isDataPacket(type))
+                {
+                    ESP_LOGV(PP_TAG, "Received Data Packet");
+                    processPacketsState = 32;
                     processDataPacket(reinterpret_cast<QueuePacket<DataPacket>*>(rx));
-                else {
-                    ESP_LOGV(LM_TAG, "Packet not identified, deleting it");
+                    processPacketsState = 33;
+                }
+                    
+                else 
+                {
+                    ESP_LOGV(PP_TAG, "Packet not identified, deleting it");
+                    processPacketsState = 34;
                     incReceivedNotForMe();
+                    processPacketsState = 35;
                     PacketQueueService::deleteQueuePacketAndPacket(rx);
+                    processPacketsState = 36;
                 }
             }
+            processPacketsLoop++;
         }
+        processPacketsLoopLast = processPacketsLoop;
     }
 }
 
@@ -1240,11 +1313,14 @@ void LoraMesher::queueManager() {
     }
 }
 
-void LoraMesher::printHeaderPacket(Packet<uint8_t>* p, String title) {
+void LoraMesher::printHeaderPacket(const char* tag, Packet<uint8_t>* p, String title) {
     bool isDataPacket = PacketService::isDataPacket(p->type);
     bool isControlPacket = PacketService::isControlPacket(p->type);
 
-    ESP_LOGE(LM_TAG, "Packet %s -- Size: %d Src: %X Dst: %X Id: %d Type: %s Via: %X Seq_Id: %d Num: %d",
+
+    //tag == LM_TAG for TX
+    //tag == PP_TAG for RX
+    ESP_LOGV(tag, "Packet %s -- Size: %d Src: %X Dst: %X Id: %d Type: %s Via: %X Seq_Id: %d Num: %d",
         title.c_str(),
         p->packetSize,
         p->src,
@@ -1353,33 +1429,29 @@ void LoraMesher::processDataPacket(QueuePacket<DataPacket>* pq) {
 
     incReceivedDataPackets();
 
-    ESP_LOGI(LM_TAG, "Data packet from %X, destination %X, via %X", packet->src, packet->dst, packet->via);
-    ESP_LOGE(LM_TAG, "Data packet from %X, destination %X, via %X, Data: %02X %02X %02X %02X", packet->src, packet->dst, packet->via, packet->payload[0], packet->payload[1], packet->payload[2], packet->payload[3]);
+    ESP_LOGI(PP_TAG, "Data packet from %X, destination %X, via %X", packet->src, packet->dst, packet->via);
+    ESP_LOGV(PP_TAG, "Data packet from %X, destination %X, via %X, Data: %02X %02X %02X %02X", packet->src, packet->dst, packet->via, packet->payload[0], packet->payload[1], packet->payload[2], packet->payload[3]);
 
     if (packet->dst == getLocalAddress()) {
-        ESP_LOGV(LM_TAG, "Data packet from %X for me, type %d", packet->src);
-        ESP_LOGE(LM_TAG, "Data packet from %X for me, type %d", packet->src);
+        ESP_LOGV(PP_TAG, "Data packet from %X for me, type %d", packet->src);
         incDataPacketForMe();
         processDataPacketForMe(pq);
         return;
     }
     else if (packet->dst == BROADCAST_ADDR) {
-        ESP_LOGV(LM_TAG, "Data packet from %X BROADCAST", packet->src);
-        ESP_LOGE(LM_TAG, "Data packet from %X BROADCAST", packet->src);
+        ESP_LOGV(PP_TAG, "Data packet from %X BROADCAST", packet->src);
         incReceivedBroadcast();
         processDataPacketForMe(pq);
         return;
     }
     else if (packet->via == getLocalAddress()) {
-        ESP_LOGV(LM_TAG, "Data Packet from %X for %X. Via is me. Forwarding it", packet->src, packet->dst);
-        ESP_LOGE(LM_TAG, "Data Packet from %X for %X. Via is me. Forwarding it", packet->src, packet->dst);
+        ESP_LOGV(PP_TAG, "Data Packet from %X for %X. Via is me. Forwarding it", packet->src, packet->dst);
         incReceivedIAmVia();
         addToSendOrderedAndNotify(reinterpret_cast<QueuePacket<Packet<uint8_t>>*>(pq));
         return;
     }
 
-    ESP_LOGV(LM_TAG, "Packet not for me, deleting it. Packet from %X for %X", packet->src, packet->dst);
-    ESP_LOGE(LM_TAG, "Packet not for me, deleting it. Packet from %X for %X", packet->src, packet->dst);
+    ESP_LOGV(PP_TAG, "Packet not for me, deleting it. Packet from %X for %X", packet->src, packet->dst);
     incReceivedNotForMe();
     PacketQueueService::deleteQueuePacketAndPacket(pq);
 }
