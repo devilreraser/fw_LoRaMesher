@@ -27,6 +27,8 @@ uint32_t processPacketsState = 0;
 uint32_t processPacketsLoop = 0;
 uint32_t processPacketsLoopLast = 0;
 
+int last_error_radio = 0;
+
 uint8_t dummy_buffer[256];
 
 LoraMesher::LoraMesher() {}
@@ -107,7 +109,7 @@ void LoraMesher::start() {
     #endif
 
     // Start Receiving
-    startReceiving();
+    startReceiving(1);
 
     // Set previous priority
     vTaskPrioritySet(NULL, prevPriority);
@@ -186,28 +188,29 @@ void LoraMesher::initializeLoRa() {
         if (radio == nullptr) {
             ESP_LOGV(LM_TAG, "Using STM32WL module");
             radio = new LM_STM32WLx();  // Pass specific module as needed
+
+            #ifdef LORA_E5_DEV_BOARD
+            // set RF switch configuration for Nucleo WL55JC1
+            // NOTE: other boards may be different!
+            //       Some boards may not have either LP or HP.
+            //       For those, do not set the LP/HP entry in the table.
+            static const uint32_t rfswitch_pins[] =
+                                    {PC3,  PC4,  PC5, RADIOLIB_NC, RADIOLIB_NC};
+            static const Module::RfSwitchMode_t rfswitch_table[] = {
+                {STM32WLx::MODE_IDLE,  {LOW,  LOW,  LOW}},
+                {STM32WLx::MODE_RX,    {HIGH, HIGH, LOW}},
+                {STM32WLx::MODE_TX_LP, {HIGH, HIGH, HIGH}},
+                {STM32WLx::MODE_TX_HP, {HIGH, LOW,  HIGH}},
+                END_OF_MODE_TABLE,
+            };
+
+            // set RF switch control configuration
+            // this has to be done prior to calling begin()
+            radio->setRfSwitchTable(rfswitch_pins, rfswitch_table);
+            #endif
         }
 
 
-        #ifdef LORA_E5_DEV_BOARD
-        // set RF switch configuration for Nucleo WL55JC1
-        // NOTE: other boards may be different!
-        //       Some boards may not have either LP or HP.
-        //       For those, do not set the LP/HP entry in the table.
-        static const uint32_t rfswitch_pins[] =
-                                {PC3,  PC4,  PC5, RADIOLIB_NC, RADIOLIB_NC};
-        static const Module::RfSwitchMode_t rfswitch_table[] = {
-            {STM32WLx::MODE_IDLE,  {LOW,  LOW,  LOW}},
-            {STM32WLx::MODE_RX,    {HIGH, HIGH, LOW}},
-            {STM32WLx::MODE_TX_LP, {HIGH, HIGH, HIGH}},
-            {STM32WLx::MODE_TX_HP, {HIGH, LOW,  HIGH}},
-            END_OF_MODE_TABLE,
-        };
-
-        // set RF switch control configuration
-        // this has to be done prior to calling begin()
-        radio->setRfSwitchTable(rfswitch_pins, rfswitch_table);
-        #endif
 
 
     } 
@@ -328,14 +331,30 @@ void LoraMesher::clearDioActions() {
     radio->clearDioActions();
 }
 
-int LoraMesher::startReceiving() {
+int LoraMesher::startReceiving(int times_enter) {
     setDioActionsForReceivePacket();
 
     int res = radio->startReceive();
     if (res != 0) {
+        last_error_radio = res;
         ESP_LOGE(LM_TAG, "Starting receiving gave error: %d", res);
-        restartRadio();
-        return startReceiving();
+        if (res == RADIOLIB_ERR_SPI_WRITE_FAILED) {
+            ESP_LOGW(LM_TAG, "SPI Write failed, restarting radio");
+            restartRadio();
+        }
+
+        //restartRadio();
+        if(times_enter < 3)
+        {
+            return startReceiving(times_enter++);
+        }
+        else
+        {
+            ESP_LOGE(LM_TAG, "Max retries reached, aborting startReceiving.");
+            return res;  // Exit with the last error code
+
+        }
+        
     }
     return res;
 }
@@ -653,7 +672,7 @@ void LoraMesher::receivingRoutine() {
 
             }
 
-            startReceiving();
+            startReceiving(1);
         }
     }
 }
@@ -705,7 +724,7 @@ void LoraMesher::waitBeforeSend(uint8_t repeatedDetectPreambles) {
     vTaskDelay(randomDelay / portTICK_PERIOD_MS);
 
     if (hasReceivedMessage) {
-        startReceiving();
+        startReceiving(1);
         ESP_LOGV(LM_TAG, "Preamble detected while waiting %d", repeatedDetectPreambles);
         waitBeforeSend(repeatedDetectPreambles + 1);
     }
@@ -851,7 +870,7 @@ bool LoraMesher::sendPacket(Packet<uint8_t>* p) {
     int resT = radio->transmit(reinterpret_cast<uint8_t*>(p), p->packetSize);
 
     //Start receiving again after sending a packet
-    startReceiving();
+    startReceiving(1);
 
     if (resT != RADIOLIB_ERR_NONE) {
         ESP_LOGE(LM_TAG, "Transmit gave error: %d", resT);

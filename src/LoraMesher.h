@@ -654,7 +654,7 @@ private:
 
     void clearDioActions();
 
-    int startReceiving();
+    int startReceiving(int times_enter);
 
     /**
      * @brief Scan activity channel
