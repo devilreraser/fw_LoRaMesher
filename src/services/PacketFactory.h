@@ -60,28 +60,28 @@ public:
                     #if USE_ALLOCATION_ROUTING_TABLE
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_ROUTING_TABLE, packetSize);
                     #else
-                    DebugHeapOnAllocationSkipRoutingTable();
+                    DebugHeapOnAllocationFailSkipRoutingTable();
                     #endif
                     break;
                 case PACKET_TYPE_CREATE_ROUTING_PACKET:
                     #if USE_ALLOCATION_ROUTING_PACKET
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_ROUTING_PACKET, packetSize);
                     #else
-                    DebugHeapOnAllocationSkipRoutingPacket();
+                    DebugHeapOnAllocationFailSkipRoutingPacket();
                     #endif
                     break;
                 case PACKET_TYPE_CREATE_CONTROL_PACKET:
                     #if USE_ALLOCATION_CONTROL_PACKET
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_CONTROL, packetSize);
                     #else
-                    DebugHeapOnAllocationSkipControlPacket();
+                    DebugHeapOnAllocationFailSkipControlPacket();
                     #endif
                     break;
                 case PACKET_TYPE_CREATE_EMPTY_CONTROL_PACKET:
                     #if USE_ALLOCATION_CONTROL_EMPTY
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_EMPTY_CONTROL, packetSize);
                     #else
-                    DebugHeapOnAllocationSkipControlEmpty();
+                    DebugHeapOnAllocationFailSkipControlEmpty();
                     #endif
                     break;
                 case PACKET_TYPE_CREATE_DATA_PACKET:
@@ -95,7 +95,7 @@ public:
                     #if USE_ALLOCATION_UNKNOWN_PACKET
                     DebugHeapOnAllocationFail(ALLOCATION_CREATE_PACKET_UNKNOWN_PACKET, packetSize);
                     #else
-                    DebugHeapOnAllocationSkipUnknownPacket();
+                    DebugHeapOnAllocationFailSkipUnknownPacket();
                     #endif
                     break;
             }

@@ -105,7 +105,7 @@ public:
             #if USE_ALLOCATION_COPY_PACKET
             DebugHeapOnAllocationFail(ALLOCATION_COPY_PACKET, packetLength);
             #else
-            DebugHeapOnAllocationSkipCopyPacket();
+            DebugHeapOnAllocationFailSkipCopyPacket();
             #endif
             ESP_LOGE(LM_TAG, "Copy Packet not allocated");
             return nullptr;

@@ -374,7 +374,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->helperRoutine(); },
         "Helper routine",
-        256 + 256,
+        256,
         this,
         6,
         &Helper_TaskHandle);
@@ -387,7 +387,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        512 + 512,  //for sure with 512 blocks
+        2048 + 2048 + 2048,  //for sure stack overflow with 4096 bytes
         this,
         6,
         &ReceivePacket_TaskHandle);
@@ -398,7 +398,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendPackets(); },
         "Sending routine",
-        256 + 256,
+        256,
         this,
         5,
         &SendData_TaskHandle);
@@ -408,7 +408,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->sendHelloPacketRoutine(); },
         "Hello routine",
-        256 + 256,
+        256,
         this,
         4,
         &Hello_TaskHandle);
@@ -419,7 +419,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->processPackets(); },
         "Process routine",
-        512 + 512,
+        512,  /* ??? not sure was there block if only set to 512 */
         this,
         3,
         &ReceiveData_TaskHandle);
@@ -431,7 +431,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->routingTableManager(); },
         "Routing Table Manager routine",
-        512 + 512,
+        512,
         this,
         2,
         &RoutingTableManager_TaskHandle);
@@ -443,7 +443,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->queueManager(); },
         "Queue Manager routine",
-        512 + 512,
+        512,
         this,
         2,
         &QueueManager_TaskHandle);
@@ -539,6 +539,12 @@ void LoraMesher::helperRoutine() {
 }
 #endif
 
+uint32_t packetSizeCreateEmptyTotal = 0;
+uint32_t packetSizeCreateEmptyMax = 0;
+uint32_t receive_routine_radiolib_err = 0;
+uint32_t receive_routine_too_big_packet = 0;
+uint32_t receive_routine_create_queue_packet = 0;
+
 void LoraMesher::receivingRoutine() {
     ESP_LOGV(LM_TAG, "Receiving routine started");
     vTaskSuspend(NULL);
@@ -571,6 +577,11 @@ void LoraMesher::receivingRoutine() {
             if (packetSize == 0)
                 ESP_LOGW(LM_TAG, "Empty packet received");
             else {
+                packetSizeCreateEmptyTotal += packetSize;
+                if (packetSizeCreateEmptyMax < packetSize)
+                {
+                    packetSizeCreateEmptyMax = packetSize;
+                }
                 Packet<uint8_t>* rx = PacketService::createEmptyPacket(packetSize);
 
                 if (rx)
@@ -595,16 +606,21 @@ void LoraMesher::receivingRoutine() {
                             restartRadio();
                         }
 
+                        receive_routine_radiolib_err++;
+
                         // TODO: Set a count to get the number of CRC errors
                         deletePacket(rx);
                     }
                     else if (packetSize != rx->packetSize) {
                         ESP_LOGW(LM_TAG, "Packet size is different from the size read");
+                        receive_routine_too_big_packet++;
                         deletePacket(rx);
                     }
                     else {
                         //Create a Packet Queue element containing the Packet
                         QueuePacket<Packet<uint8_t>>* pq = PacketQueueService::createQueuePacket(rx, 0, 0, rssi, snr);
+
+                        receive_routine_create_queue_packet++;
 
                         //Add the Packet Queue element created into the ReceivedPackets List
                         ReceivedPackets->Append(pq);
@@ -1822,7 +1838,7 @@ void LoraMesher::joinPacketsAndNotifyUser(listConfiguration* listConfig) {
         #if USE_ALLOCATION_APP_PACKET
         DebugHeapOnAllocationFail(ALLOCATION_APP_PACKET, packetLength);
         #else
-        DebugHeapOnAllocationSkipAppPacket();
+        DebugHeapOnAllocationFailSkipAppPacket();
         #endif
     }
 
