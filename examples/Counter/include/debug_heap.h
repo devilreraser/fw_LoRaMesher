@@ -9,7 +9,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdbool.h>
 
-#define USE_DEBUG_HEAP                  0
+#define USE_DEBUG_HEAP                  1
 
 #define USE_ALLOCATION_PRINTF_CIRCLE    0
 #define USE_ALLOCATION_PRINTF_QUEUE     0
@@ -75,6 +75,7 @@ void DebugHeapOnFree(e_AllocationName_t eName, void* pData);
 void DebugHeapOnFreeCheckAll(void* pData);
 void DebugHeapPrint(bool skipUnused);
 void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen);
+
 void DebugHeapOnAllocationSkipPrintfCircle(void);
 void DebugHeapOnAllocationSkipPrintfQueue(void);
 void DebugHeapOnAllocationSkipAppPacket(void);
@@ -85,6 +86,26 @@ void DebugHeapOnAllocationSkipControlPacket(void);
 void DebugHeapOnAllocationSkipControlEmpty(void);
 void DebugHeapOnAllocationSkipUnknownPacket(void);
 
+void DebugHeapOnAllocationFailSkipPrintfCircle(void);
+void DebugHeapOnAllocationFailSkipPrintfQueue(void);
+void DebugHeapOnAllocationFailSkipAppPacket(void);
+void DebugHeapOnAllocationFailSkipCopyPacket(void);
+void DebugHeapOnAllocationFailSkipRoutingTable(void);
+void DebugHeapOnAllocationFailSkipRoutingPacket(void);
+void DebugHeapOnAllocationFailSkipControlPacket(void);
+void DebugHeapOnAllocationFailSkipControlEmpty(void);
+void DebugHeapOnAllocationFailSkipUnknownPacket(void);
+
+void DebugHeapOnFreeSkipPrintfCircle(void);
+void DebugHeapOnFreeSkipPrintfQueue(void);
+void DebugHeapOnFreeSkipAppPacket(void);
+void DebugHeapOnFreeSkipCopyPacket(void);
+void DebugHeapOnFreeSkipRoutingTable(void);
+void DebugHeapOnFreeSkipRoutingPacket(void);
+void DebugHeapOnFreeSkipControlPacket(void);
+void DebugHeapOnFreeSkipControlEmpty(void);
+void DebugHeapOnFreeSkipUnknownPacket(void);
+
 #else
 
 inline void DebugHeapInit(void) {}
@@ -94,6 +115,7 @@ inline void DebugHeapOnFree(e_AllocationName_t, void*) {}
 inline void DebugHeapOnFreeCheckAll(void*) {}
 inline void DebugHeapPrint(bool) {}
 inline void DebugHeapPrintPears(e_AllocationName_t, uint32_t) {}
+
 inline void DebugHeapOnAllocationSkipPrintfCircle(void) {}
 inline void DebugHeapOnAllocationSkipPrintfQueue(void) {}
 inline void DebugHeapOnAllocationSkipAppPacket(void) {}
@@ -103,6 +125,26 @@ inline void DebugHeapOnAllocationSkipRoutingPacket(void) {}
 inline void DebugHeapOnAllocationSkipControlPacket(void) {}
 inline void DebugHeapOnAllocationSkipControlEmpty(void) {}
 inline void DebugHeapOnAllocationSkipUnknownPacket(void) {}
+
+inline void DebugHeapOnAllocationFailSkipPrintfCircle(void) {}
+inline void DebugHeapOnAllocationFailSkipPrintfQueue(void) {}
+inline void DebugHeapOnAllocationFailSkipAppPacket(void) {}
+inline void DebugHeapOnAllocationFailSkipCopyPacket(void) {}
+inline void DebugHeapOnAllocationFailSkipRoutingTable(void) {}
+inline void DebugHeapOnAllocationFailSkipRoutingPacket(void) {}
+inline void DebugHeapOnAllocationFailSkipControlPacket(void) {}
+inline void DebugHeapOnAllocationFailSkipControlEmpty(void) {}
+inline void DebugHeapOnAllocationFailSkipUnknownPacket(void) {}
+
+inline void DebugHeapOnFreeSkipPrintfCircle(void) {}
+inline void DebugHeapOnFreeSkipPrintfQueue(void) {}
+inline void DebugHeapOnFreeSkipAppPacket(void) {}
+inline void DebugHeapOnFreeSkipCopyPacket(void) {}
+inline void DebugHeapOnFreeSkipRoutingTable(void) {}
+inline void DebugHeapOnFreeSkipRoutingPacket(void) {}
+inline void DebugHeapOnFreeSkipControlPacket(void) {}
+inline void DebugHeapOnFreeSkipControlEmpty(void) {}
+inline void DebugHeapOnFreeSkipUnknownPacket(void) {}
 
 #endif
 

@@ -55,7 +55,29 @@ uint32_t u32OnAllocationSkipRoutingPacket = 0;
 uint32_t u32OnAllocationSkipControlPacket = 0;
 uint32_t u32OnAllocationSkipControlEmpty = 0;
 uint32_t u32OnAllocationSkipUnknownPacket = 0;
+
+uint32_t u32OnAllocationFailSkipPrintfCircle = 0;
+uint32_t u32OnAllocationFailSkipPrintfQueue = 0;
+uint32_t u32OnAllocationFailSkipAppPacket = 0;
+uint32_t u32OnAllocationFailSkipCopyPacket = 0;
+uint32_t u32OnAllocationFailSkipRoutingTable = 0;
+uint32_t u32OnAllocationFailSkipRoutingPacket = 0;
+uint32_t u32OnAllocationFailSkipControlPacket = 0;
+uint32_t u32OnAllocationFailSkipControlEmpty = 0;
+uint32_t u32OnAllocationFailSkipUnknownPacket = 0;
+
+uint32_t u32OnFreeSkipPrintfCircle = 0;
+uint32_t u32OnFreeSkipPrintfQueue = 0;
+uint32_t u32OnFreeSkipAppPacket = 0;
+uint32_t u32OnFreeSkipCopyPacket = 0;
+uint32_t u32OnFreeSkipRoutingTable = 0;
+uint32_t u32OnFreeSkipRoutingPacket = 0;
+uint32_t u32OnFreeSkipControlPacket = 0;
+uint32_t u32OnFreeSkipControlEmpty = 0;
+uint32_t u32OnFreeSkipUnknownPacket = 0;
+
 uint32_t u32OnFreePairNotFound = 0;
+uint32_t u32OnFreeZeroPointer = 0;
 
 
 static uint32_t u32AllocatedMemoryBytes = 0;
@@ -231,8 +253,9 @@ void DebugHeapOnFree(e_AllocationName_t eName, void* pData)
 
 void DebugHeapOnFreeCheckAll(void* pData) {
     if (pData == NULL) {
-        // Free the allocation if found
-        ESP_LOGE(TAG, "[ERROR] NULL pointer passed to DebugHeapOnFreeCheckAll.");
+        u32OnFreeZeroPointer++;
+        // do not print here (only for debug purposes)
+        //ESP_LOGE(TAG, "[ERROR] NULL pointer passed to DebugHeapOnFreeCheckAll.");
         return;
     }
 
@@ -245,7 +268,7 @@ void DebugHeapOnFreeCheckAll(void* pData) {
                 DebugHeapOnFree((e_AllocationName_t)i, pData);
 
                 //do not print here - could block forever on debug heap
-                ESP_LOGV(TAG, "Freed allocation: Type %d, Addr: %p, Size: %u bytes", i, pData, asDebugHeapPair[i][j].nSize);
+                //ESP_LOGV(TAG, "Freed allocation: Type %d, Addr: %p, Size: %u bytes", i, pData, asDebugHeapPair[i][j].nSize);
 
                 return; // Exit once the allocation is found and freed
             }
@@ -254,8 +277,8 @@ void DebugHeapOnFreeCheckAll(void* pData) {
 
     u32OnFreePairNotFound++;
 
-    // Free the allocation if found
-    ESP_LOGE(TAG, "Pointer %p not found in any allocation type.", pData);
+    // do not print here (only for debug purposes)
+    // ESP_LOGE(TAG, "Pointer %p not found in any allocation type.", pData);
 }
 
 
@@ -394,6 +417,96 @@ void DebugHeapOnAllocationSkipControlEmpty(void)
 void DebugHeapOnAllocationSkipUnknownPacket(void)
 {
     u32OnAllocationSkipUnknownPacket++;
+}
+
+
+void DebugHeapOnAllocationFailSkipPrintfCircle(void)
+{
+    u32OnAllocationFailSkipPrintfCircle++;
+}
+void DebugHeapOnAllocationFailSkipPrintfQueue(void)
+{
+    u32OnAllocationFailSkipPrintfQueue++;
+}
+
+void DebugHeapOnAllocationFailSkipAppPacket(void)
+{
+    u32OnAllocationFailSkipAppPacket++;
+}
+
+void DebugHeapOnAllocationFailSkipCopyPacket(void)
+{
+    u32OnAllocationFailSkipCopyPacket++;
+}
+
+void DebugHeapOnAllocationFailSkipRoutingTable(void)
+{
+    u32OnAllocationFailSkipRoutingTable++;
+}
+
+void DebugHeapOnAllocationFailSkipRoutingPacket(void)
+{
+    u32OnAllocationFailSkipRoutingPacket++;
+}
+
+void DebugHeapOnAllocationFailSkipControlPacket(void)
+{
+    u32OnAllocationFailSkipControlPacket++;
+}
+
+void DebugHeapOnAllocationFailSkipControlEmpty(void)
+{
+    u32OnAllocationFailSkipControlEmpty++;
+}
+
+void DebugHeapOnAllocationFailSkipUnknownPacket(void)
+{
+    u32OnAllocationFailSkipUnknownPacket++;
+}
+
+
+void DebugHeapOnFreeSkipPrintfCircle(void)
+{
+    u32OnFreeSkipPrintfCircle++;
+}
+void DebugHeapOnFreeSkipPrintfQueue(void)
+{
+    u32OnFreeSkipPrintfQueue++;
+}
+
+void DebugHeapOnFreeSkipAppPacket(void)
+{
+    u32OnFreeSkipAppPacket++;
+}
+
+void DebugHeapOnFreeSkipCopyPacket(void)
+{
+    u32OnFreeSkipCopyPacket++;
+}
+
+void DebugHeapOnFreeSkipRoutingTable(void)
+{
+    u32OnFreeSkipRoutingTable++;
+}
+
+void DebugHeapOnFreeSkipRoutingPacket(void)
+{
+    u32OnFreeSkipRoutingPacket++;
+}
+
+void DebugHeapOnFreeSkipControlPacket(void)
+{
+    u32OnFreeSkipControlPacket++;
+}
+
+void DebugHeapOnFreeSkipControlEmpty(void)
+{
+    u32OnFreeSkipControlEmpty++;
+}
+
+void DebugHeapOnFreeSkipUnknownPacket(void)
+{
+    u32OnFreeSkipUnknownPacket++;
 }
 
 

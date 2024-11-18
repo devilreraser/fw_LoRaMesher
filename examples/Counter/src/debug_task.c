@@ -7,7 +7,7 @@
 #include "task.h"
 #include "semphr.h"
 
-#define MAX_TASKS 32
+#define MAX_TASKS 16
 #define TASK_NAME_LEN 16
 #define TAG "DBG_TASK"
 

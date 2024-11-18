@@ -92,6 +92,7 @@
 #define LED_OFF     HIGH
 #endif  
 
+bool concentrator = USE_AS_CONCENTRATOR;
 
 uint16_t id_concentrator = BROADCAST_ADDR;
 
@@ -159,7 +160,7 @@ static uint32_t u32BroadcastPackets = 0;
 
 
 
-// Limit the vector to store a maximum of 64 unique broadcast payloads
+// Limit the vector to store a maximum of 32 unique broadcast payloads
 std::vector<dataPacket> previousBroadcastPayloads;
 const size_t maxBroadcastPayloads = 32; //256 bytes 32 payloads
 
@@ -179,7 +180,7 @@ void print_version() {
 #include <stdint.h>
 #include <string.h>
 
-#define CIRCULAR_BUFFER_SIZE 1024  // Define the total buffer size
+#define CIRCULAR_BUFFER_SIZE 256  // Define the total buffer size
 
 typedef struct {
     char data[CIRCULAR_BUFFER_SIZE];  // Fixed circular buffer
@@ -265,7 +266,7 @@ void circular_free(CircularMallocBuffer* buffer, void* ptr) {
 
 /* circular queue start */
 
-#define CIRCULAR_QUEUE_SIZE 16  // Define the maximum number of pointers in the queue
+#define CIRCULAR_QUEUE_SIZE 8  // Define the maximum number of pointers in the queue
 
 typedef struct {
     void *data[CIRCULAR_QUEUE_SIZE];  // Array to hold pointers
@@ -322,8 +323,8 @@ bool CircularQueue_Dequeue(CircularQueue *queue, void **item) {
 
 
 
-#define BUFFER_SIZE 2048
-#define QUEUE_LENGTH 128
+#define BUFFER_SIZE 1024-1
+#define QUEUE_LENGTH 32
 
 static QueueHandle_t serialQueue = NULL;
 
@@ -348,6 +349,7 @@ static uint32_t u32SkippedSerialQueueSendFromCircle = 0;
 
 
 static uint32_t trackConvertedPacketsToMainNum = 0;
+static uint32_t lastPrintfMallocBytes = 0;
 
 
 extern "C" int _write(int file, char *ptr, int len) {
@@ -373,16 +375,17 @@ extern "C" int _write(int file, char *ptr, int len) {
     char *buffer = NULL;
     if (printOnReceiveFlag == false)
     {
+        lastPrintfMallocBytes = copyLen + 1;
         buffer = (char *)pvPortMalloc(copyLen + 1); //this halts if from event onReceive
         if (buffer == NULL) {
             #if USE_ALLOCATION_PRINTF_QUEUE
             DebugHeapOnAllocationFail(ALLOCATION_PRINTF_QUEUE, copyLen + 1);
             #else
-            DebugHeapOnAllocationSkipPrintfQueue();
+            DebugHeapOnAllocationFailSkipPrintfQueue();
             #endif
             // Handle memory allocation failure
             u32SkippedPrintfMemMalloc++;
-            u32SkippedPrintfMemMallocBytes += len;
+            u32SkippedPrintfMemMallocBytes += copyLen + 1;
             return -1;
         }
         DebugHeapAllocateCount((void*)buffer, copyLen + 1);
@@ -399,11 +402,11 @@ extern "C" int _write(int file, char *ptr, int len) {
             #if USE_ALLOCATION_PRINTF_CIRCLE
             DebugHeapOnAllocationFail(ALLOCATION_PRINTF_CIRCLE, copyLen + 1);
             #else
-            DebugHeapOnAllocationSkipPrintfCircle();
+            DebugHeapOnAllocationFailSkipPrintfCircle();
             #endif
             // Handle memory allocation failure
             u32SkippedPrintfCirMalloc++;
-            u32SkippedPrintfCirMallocBytes += len;
+            u32SkippedPrintfCirMallocBytes += copyLen + 1;
             return -1;
         }
         DebugHeapAllocateCount((void*)buffer, copyLen + 1);
@@ -432,11 +435,11 @@ extern "C" int _write(int file, char *ptr, int len) {
                     #if USE_ALLOCATION_PRINTF_QUEUE
                     DebugHeapOnAllocationFail(ALLOCATION_PRINTF_QUEUE, copyLenLoop + 1);
                     #else
-                    DebugHeapOnAllocationSkipPrintfQueue();
+                    DebugHeapOnAllocationFailSkipPrintfQueue();
                     #endif
                     // Handle memory allocation failure
                     u32SkippedPrintfMemMallocFromCircle++;
-                    u32SkippedPrintfMemMallocBytesFromCircle += len;
+                    u32SkippedPrintfMemMallocBytesFromCircle += copyLenLoop + 1;
                     DebugHeapFreeCount((void*)bufferCopyOld);
                     #if USE_ALLOCATION_PRINTF_CIRCLE
                     DebugHeapOnFree(ALLOCATION_PRINTF_CIRCLE, (void*)bufferCopyOld);
@@ -659,8 +662,11 @@ void serialTask(void *pvParameters) {
     }
 }
 
-
-
+uint32_t timesMallocFailed = 0;
+extern "C" void vApplicationMallocFailedHook( void )
+{
+    timesMallocFailed++;
+}
 
 
 void printTaskList() {
@@ -839,7 +845,7 @@ void createLedLoRaE5Indication() {
     int res = xTaskCreate(
         processLedLoRaE5Indication,
         "Led LoRa E5 Indication Task",
-        256 + 256,
+        256,
         (void*) 1,
         2,
         &ledLoRaE5Indication_Handle);
@@ -1021,57 +1027,46 @@ void processReceivedPackets(void*) {
                 isOurs = true;
             }
 
+           
             // Check if the packet comes from us but is heard from another device
-            if (isOurs)
-            {
+            if (isOurs) {
                 u32HeardOurPackets++;
                 isUnique = false;
-            }
-            else
-            // Check if the packet is a broadcast message when endpoint
-            #if USE_AS_CONCENTRATOR == 0
-            if (packet->dst != BROADCAST_ADDR) 
-            {
-                u32NonBroadcastPackets++;
-                isUnique = true;
-                //to do remove duplicated if is concentrator and not broadcast because could come from several endpoints re-transmitted
-            }
-            else
-            #endif
-            {
-                u32BroadcastPackets++;
-                // Flag to track if the payload is unique
-                isUnique = true;
+            } else {
+                // Handle non-broadcast packets when not acting as a concentrator
+                if (!concentrator && packet->dst != BROADCAST_ADDR) {
+                    u32NonBroadcastPackets++;
+                    isUnique = true;
+                } else {
+                    u32BroadcastPackets++;
+                    isUnique = true;
 
-                dataPacket* helloPacketReceived = packet->payload;
+                    dataPacket* helloPacketReceived = packet->payload;
 
-                // Compare with previous broadcast payloads
-                for (const auto& previousPayload : previousBroadcastPayloads) {
-                    if (memcmp(helloPacketReceived, &previousPayload, sizeof(dataPacket)) == 0) {
-                        isUnique = false;
-                        ESP_LOGI(TAG, "Duplicate broadcast message detected, skipping retransmission.");
-                        break;
+                    // Compare with previous broadcast payloads to detect duplicates
+                    for (const auto& previousPayload : previousBroadcastPayloads) {
+                        if (memcmp(helloPacketReceived, &previousPayload, sizeof(dataPacket)) == 0) {
+                            isUnique = false;
+                            ESP_LOGI(TAG, "Duplicate broadcast message detected, skipping retransmission.");
+                            break;
+                        }
+                    }
+
+                    // If unique, retransmit if needed and store in the list
+                    if (isUnique) {
+                        if (!concentrator) {
+                            ESP_LOGI(TAG, "Retransmitting unique broadcast message...");
+                            radio.createPacketAndSend(BROADCAST_ADDR, packet->payload, packet->getPayloadLength());
+                        }
+
+                        // Maintain size limit of previousBroadcastPayloads
+                        if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
+                            previousBroadcastPayloads.erase(previousBroadcastPayloads.begin());  // Remove the oldest entry
+                        }
+                        previousBroadcastPayloads.push_back(*helloPacketReceived);  // Store the new unique payload
                     }
                 }
-
-                
-                // If unique, retransmit if needed and store in the list
-                if (isUnique) {
-                    #if USE_AS_CONCENTRATOR == 0
-                    ESP_LOGI(TAG, "Retransmitting unique broadcast message...");
-                    radio.createPacketAndSend(BROADCAST_ADDR, packet->payload, packet->getPayloadLength());
-                    #endif
-                    
-                    // Check the size of previousBroadcastPayloads and maintain the limit
-                    if (previousBroadcastPayloads.size() >= maxBroadcastPayloads) {
-                        previousBroadcastPayloads.erase(previousBroadcastPayloads.begin());  // Remove the oldest entry
-                    }
-                    // Store the new unique payload
-                    previousBroadcastPayloads.push_back(*helloPacketReceived);
-                }
             }
-
-            
 
 
             if (isUnique)
@@ -1172,7 +1167,7 @@ void createReceiveMessages() {
     int res = xTaskCreate(
         processReceivedPackets,
         "Receive App Task",
-        512 + 512,
+        512,
         (void*) 1,
         2,
         &receiveLoRaMessage_Handle);
@@ -1440,7 +1435,6 @@ void MesherTask(void *pvParameters) {
     helloPacket->id_sender = radio.getLocalAddress();
 
 
-    bool concentrator = USE_AS_CONCENTRATOR;
     print_version();
     printf("USE_AS_CONCENTRATOR: %s\r\n", (concentrator)?"TRUE":"FALSE");
     printf("LORA_IDENTIFICATION: 0x%04X\r\n", radio.getLocalAddress());
@@ -1515,6 +1509,7 @@ void MesherTask(void *pvParameters) {
             switch (printLoopState)
             {
                 case 1:
+                    ESP_LOGE(TAG, "timesMallocFailed                %d", timesMallocFailed);
                     printRoutingTable();
                     break;
                 case 2:
@@ -1629,19 +1624,23 @@ void MesherTask(void *pvParameters) {
 
 
 
-        #if USE_AS_CONCENTRATOR
-        //Wait n seconds to send the next packet
-        //vTaskDelay(20000 / portTICK_PERIOD_MS);
-        //vTaskDelay(5000 / portTICK_PERIOD_MS);
-        vTaskDelay(30000 / portTICK_PERIOD_MS);
-        //delay(2000);
-        #else
-        //Wait n seconds to send the next packet
-        //vTaskDelay(5000 / portTICK_PERIOD_MS);
-        //vTaskDelay(2000 / portTICK_PERIOD_MS);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-        //delay(5000);
-        #endif
+        if (concentrator)
+        {
+            //Wait n seconds to send the next packet
+            //vTaskDelay(20000 / portTICK_PERIOD_MS);
+            //vTaskDelay(5000 / portTICK_PERIOD_MS);
+            vTaskDelay(30000 / portTICK_PERIOD_MS);
+            //delay(2000);
+        }
+        else
+        {
+            //Wait n seconds to send the next packet
+            //vTaskDelay(5000 / portTICK_PERIOD_MS);
+            //vTaskDelay(2000 / portTICK_PERIOD_MS);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            //delay(5000);
+        }
+
     }
 }
 
@@ -1662,7 +1661,7 @@ void setup() {
     Serial.print("Firmware Version: ");
     Serial.println(BUILD_VERSION_STRING);
     Serial.print("ConcentratorRole: ");
-    Serial.println(USE_AS_CONCENTRATOR?"TRUE":"FALSE");
+    Serial.println(concentrator?"TRUE":"FALSE");
     Serial.print("Device NetworkID: 0x");
     Serial.println(radio.getLocalAddress(),HEX);
     Serial.println("UART Initialized.");
@@ -1677,7 +1676,7 @@ void setup() {
     Serial.print("serialQueue created\r\n");
 
     // Create task for printf -> Serial handling
-    res = xTaskCreate(serialTask,"SerialTask", 256 + 256, NULL, 1, NULL);
+    res = xTaskCreate(serialTask,"SerialTask", 256, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "SerialTask creation gave error: %d", res);
     }
@@ -1783,7 +1782,7 @@ void setup() {
     #endif
 
     // Create task for printf -> Serial handling
-    res = xTaskCreate(MesherTask,"MesherTask",512 + 512, NULL, 1, NULL);
+    res = xTaskCreate(MesherTask,"MesherTask",512, NULL, 1, NULL);
     if (res != pdPASS) {
         ESP_LOGE("main", "MesherTask creation gave error: %d", res);
     }
