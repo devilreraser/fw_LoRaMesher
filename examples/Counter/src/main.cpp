@@ -21,10 +21,12 @@
 
 #define TAG "main"
 
-#define USE_AS_CONCENTRATOR   0       /* 0:endpoint 1:concentrator */
+#define USE_AS_CONCENTRATOR         0       /* 0:endpoint 1:concentrator */
+
+#define ENDPOINT_SELECT_PIN         PB13    /* Pull-up (1) - endpoint mode | GND (0) - concentrator mode */
 
 
-#define USE_SERIAL_PRINT_SEMPHR 0
+#define USE_SERIAL_PRINT_SEMPHR     0
 
 
 
@@ -165,8 +167,10 @@ std::vector<dataPacket> previousBroadcastPayloads;
 const size_t maxBroadcastPayloads = 32; //256 bytes 32 payloads
 
 void printTaskList(void);
+void console_response(void);
 
 
+int printDetailsLoopState = 0;
 int printLoopState = 0;
 uint32_t u32LoopTaskCounter = 0;
 
@@ -508,45 +512,23 @@ void processCommand(String command) {
         Serial.println(command);
         printTaskList();
     } else 
-    if (command == "p0") {
-        printLoopState = 0;
-        Serial.print("Executing command: ");
-        Serial.println(command);
-    } else 
-    if (command == "p1") {
-        printLoopState = 1;
-        Serial.print("Executing command: ");
-        Serial.println(command);
-    } else 
-    if (command == "p2") {
-        printLoopState = 2;
-        Serial.print("Executing command: ");
-        Serial.println(command);
-    } else 
     if (command.startsWith("p")) {
         String print_state = command.substring(1);  // Extract value after "p"
-        if (print_state == "3")
+
+        int loop_state = print_state.toInt();
+        if (loop_state >= 0)
         {
-            printLoopState = 3;
+            printLoopState = loop_state;
             Serial.print("Executing command: ");
             Serial.println(command);
+            console_response();
         }
         else
         {
-            int loop_state = print_state.toInt();
-            if (loop_state >= 0)
-            {
-                printLoopState = loop_state;
-                Serial.print("Executing command: ");
-                Serial.println(command);
-
-            }
-            else
-            {
-                Serial.print("Unimplemented command: ");
-                Serial.println(command);
-            }
+            Serial.print("Unimplemented command: ");
+            Serial.println(command);
         }
+        
     } else {
         Serial.print("Unknown command: ");
         Serial.println(command);
@@ -914,7 +896,7 @@ void printRouteNode(RouteNode* routeNode) {
     
 
 
-void printRoutingTable() {
+void mainPrintRoutingTable() {
     // Get a copy of the routing table
     
     LM_LinkedList<RouteNode>* routingTable = radio.routingTableListCopy();
@@ -1420,7 +1402,6 @@ void printSubGHzInterruptPriority() {
 void MesherTask(void *pvParameters) {
     // This replaces the `loop()` function with main Mesher Function
 
-    int printDetailsLoopState = 0;
 
     #ifdef USE_RED_LED_SEEED_GROVE_LORA_E5
     //sendLedLoRaE5Indication(CODE_INIT_START);
@@ -1442,9 +1423,8 @@ void MesherTask(void *pvParameters) {
 
         DebugTaskCounter(pcTaskGetName(NULL));
 
-        ESP_LOGE(TAG, "---!BEG!---");
         ESP_LOGV("main", "Stack space unused after entering the task MesherTask: %d", uxTaskGetStackHighWaterMark(NULL));
-        ESP_LOGE("main", "Free heap: %d", getFreeHeap());
+        ESP_LOGV("main", "Free heap: %d", getFreeHeap());
 
         if (concentrator)
         {
@@ -1502,124 +1482,6 @@ void MesherTask(void *pvParameters) {
             }
         }
 
-        if (printLoopState)
-        {
-
-            ESP_LOGE(TAG, "---!%-3d!---", printLoopState);
-            switch (printLoopState)
-            {
-                case 1:
-                    ESP_LOGE(TAG, "timesMallocFailed                %d", timesMallocFailed);
-                    printRoutingTable();
-                    break;
-                case 2:
-                    ESP_LOGE(TAG, "routingTableSize                 %d", radio.routingTableSize());
-                    ESP_LOGE(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
-                    ESP_LOGE(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
-                    ESP_LOGE(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
-                    ESP_LOGE(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
-                    ESP_LOGE(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
-                    ESP_LOGE(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
-                    ESP_LOGE(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
-                    ESP_LOGE(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
-                    ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
-                    ESP_LOGE(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
-                    ESP_LOGE(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
-                    ESP_LOGE(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
-                    ESP_LOGE(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
-                    ESP_LOGE(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
-                    ESP_LOGE(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
-                    ESP_LOGE(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
-                    ESP_LOGE(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
-                    break;
-                case 3:
-                    ESP_LOGE(TAG, "u32LoopTaskCounter                       %d", u32LoopTaskCounter);
-                    ESP_LOGE(TAG, "DebugHeapTimesGet                        %d", DebugHeapTimesGet());
-                    ESP_LOGE(TAG, "Free heap:                               %d", getFreeHeap());
-                    ESP_LOGE(TAG, "getOnReceiveEventsCounter                %d", radio.getOnReceiveEventsCounter());
-                    ESP_LOGE(TAG, "u32HeardOurPackets                       %d", u32HeardOurPackets);
-                    ESP_LOGE(TAG, "u32BroadcastPackets                      %d", u32BroadcastPackets);
-                    ESP_LOGE(TAG, "u32NonBroadcastPackets                   %d", u32NonBroadcastPackets);
-                    ESP_LOGE(TAG, "u32SkippedPrintfMemMalloc                %d", u32SkippedPrintfMemMalloc);
-                    ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytes           %d", u32SkippedPrintfMemMallocBytes);
-                    ESP_LOGE(TAG, "u32SkippedSerialQueueSend                %d", u32SkippedSerialQueueSend);
-                    ESP_LOGE(TAG, "u32PrintfReceiveEventFlag                %d", u32PrintfReceiveEventFlag);
-                    ESP_LOGE(TAG, "u32SkippedPrintfCirMalloc                %d", u32SkippedPrintfCirMalloc);
-                    ESP_LOGE(TAG, "u32SkippedPrintfCirMallocBytes           %d", u32SkippedPrintfCirMallocBytes);
-                    ESP_LOGE(TAG, "u32SkippedCircleQueueSend                %d", u32SkippedCircleQueueSend);
-                    ESP_LOGE(TAG, "u32SkippedPrintfMemMallocFromCircle      %d", u32SkippedPrintfMemMallocFromCircle);
-                    ESP_LOGE(TAG, "u32SkippedPrintfMemMallocBytesFromCircle %d", u32SkippedPrintfMemMallocBytesFromCircle);
-                    ESP_LOGE(TAG, "u32SkippedSerialQueueSendFromCircle      %d", u32SkippedSerialQueueSendFromCircle);
-                    break;
-                case 4:
-                    printSubGHzInterruptPriority();
-                    break;
-                case 5:
-                    printTaskList();
-                    break;
-                case 6:
-                    DebugHeapPrint(true);
-                    break;
-                case 7:
-                    if (printDetailsLoopState >= ALLOCATION_COUNT)
-                    {
-                        printDetailsLoopState = 0;
-                    }
-                    DebugHeapPrintPears((e_AllocationName_t)printDetailsLoopState, 32);
-                    printDetailsLoopState++;
-                    break;
-                case 8:
-                    radio.printAllPacketsInSendQueue(10);
-                    radio.printAllPacketsInRecvQueue(10);
-                    radio.printAllPacketsInDataQueue(10);
-                    break;
-                case 9:
-                
-                    ESP_LOGE(TAG, "??????????????????????????????????????????????????");
-                    ESP_LOGE(TAG, "getReSentPackets()               %d", radio.getReSentPackets());
-                    ESP_LOGE(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
-                    ESP_LOGE(TAG, "getSendRoutingTablePacketNum     %d", radio.getSendRoutingTablePacketNum());
-                    ESP_LOGE(TAG, "getSendHelloPacketNum            %d", radio.getSendHelloPacketNum());
-                    ESP_LOGE(TAG, "getSendRTRequestPacketNum        %d", radio.getSendRTRequestPacketNum());
-                    ESP_LOGE(TAG, "getSendAckPacketNum              %d", radio.getSendAckPacketNum());
-                    ESP_LOGE(TAG, "getSendLostPacketNum             %d", radio.getSendLostPacketNum());
-                    ESP_LOGE(TAG, "getSendPacketSequenceNum         %d", radio.getSendPacketSequenceNum());
-                    ESP_LOGE(TAG, "getSendAppPacketNum              %d", radio.getSendAppPacketNum());
-                    ESP_LOGE(TAG, "getSendRandomTotalWait           %d ms", radio.getSendRandomTotalWait());
-
-
-                    break;
-                case 10:
-                    ESP_LOGE(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                    ESP_LOGE(TAG, "previousBroadcastPayloads.size()         %d", previousBroadcastPayloads.size());
-                    ESP_LOGE(TAG, "radio.routingTableSize()                 %d", radio.routingTableSize());
-                    ESP_LOGE(TAG, "radio.q_WSP->getLength()                 %d", radio.q_WSP->getLength());
-                    ESP_LOGE(TAG, "radio.q_WRP->getLength()                 %d", radio.q_WRP->getLength());
-                    ESP_LOGE(TAG, "radio.ReceivedAppPackets->getLength()    %d", radio.ReceivedAppPackets->getLength());
-                    ESP_LOGE(TAG, "radio.ReceivedPackets->getLength()       %d", radio.ReceivedPackets->getLength());
-                    ESP_LOGE(TAG, "radio.ToSendPackets->getLength()         %d", radio.ToSendPackets->getLength());
-                    ESP_LOGE(TAG, "routingTableList->getLength()            %d", RoutingTableService::routingTableList->getLength());
-
-                    break;
-
-                case 11:
-                    DebugTaskPrintStats();
-                    break;
-                case 12:
-                    ESP_LOGE(TAG, "TrackConvertedPacketsForMeNum    %d", radio.getTrackConvertedPacketsForMeNum());
-                    ESP_LOGE(TAG, "TrackConvertedPacketsNotifyNum   %d", radio.getTrackConvertedPacketsNotifyNum());
-                    ESP_LOGE(TAG, "trackConvertedPacketsToMainNum   %d", trackConvertedPacketsToMainNum);
-                    break;
-                default:
-                    printLoopState = -1;
-                    break;
-            }
-            ESP_LOGE(TAG, "---!END!---");
-
-
-
-            printLoopState = 0;
-        }
 
 
 
@@ -1646,6 +1508,7 @@ void MesherTask(void *pvParameters) {
 
 void setup() {
 
+
     DebugHeapInit();
     initBuffer(&buffer_uart_printf);
     CircularQueue_Init(&circularQueue);
@@ -1660,11 +1523,22 @@ void setup() {
     Serial.println("");
     Serial.print("Firmware Version: ");
     Serial.println(BUILD_VERSION_STRING);
-    Serial.print("ConcentratorRole: ");
-    Serial.println(concentrator?"TRUE":"FALSE");
     Serial.print("Device NetworkID: 0x");
     Serial.println(radio.getLocalAddress(),HEX);
     Serial.println("UART Initialized.");
+
+    /* select mode from boot pin */
+    pinMode(ENDPOINT_SELECT_PIN, INPUT_PULLUP); 
+    delay(10);
+    Serial.print("ENDPOINT_SELECT_PIN: ");
+    Serial.println(digitalRead(ENDPOINT_SELECT_PIN));
+    Serial.print("!ENDPOINT_SELECT_PIN: ");
+    Serial.println(!digitalRead(ENDPOINT_SELECT_PIN));
+    concentrator = !digitalRead(ENDPOINT_SELECT_PIN);
+
+    Serial.print("ConcentratorRole: ");
+    Serial.println(concentrator?"TRUE":"FALSE");
+
 
     // Create the queue
     serialQueue = xQueueCreate(QUEUE_LENGTH, sizeof(char *));
@@ -1790,7 +1664,7 @@ void setup() {
 
 
 
-    #ifndef ESP32
+    #ifndef ESP32printLoopState
     vTaskStartScheduler();
     #endif
 
@@ -1808,4 +1682,129 @@ void loop() {
         delay(1000);
     }
     return;
+}
+
+
+void console_response(void)
+{
+    ESP_LOGI(TAG, "---!BEG!---");
+    if (printLoopState)
+    {
+
+        ESP_LOGI(TAG, "---!%-3d!---", printLoopState);
+        switch (printLoopState)
+        {
+            case 1:
+                ESP_LOGI(TAG, "timesMallocFailed                %d", timesMallocFailed);
+                mainPrintRoutingTable();
+                break;
+            case 2:
+                ESP_LOGI(TAG, "routingTableSize                 %d", radio.routingTableSize());
+                ESP_LOGI(TAG, "getLocalAddress                  %X", radio.getLocalAddress());
+                ESP_LOGI(TAG, "getReceivedDataPacketsNum        %d", radio.getReceivedDataPacketsNum());
+                ESP_LOGI(TAG, "getSendPacketsNum                %d", radio.getSendPacketsNum());
+                ESP_LOGI(TAG, "getReceivedHelloPacketsNum       %d", radio.getReceivedHelloPacketsNum());
+                ESP_LOGI(TAG, "getSentHelloPacketsNum           %d", radio.getSentHelloPacketsNum());
+                ESP_LOGI(TAG, "getReceivedBroadcastPacketsNum   %d", radio.getReceivedBroadcastPacketsNum());
+                ESP_LOGI(TAG, "getForwardedPacketsNum           %d", radio.getForwardedPacketsNum());
+                ESP_LOGI(TAG, "getDataPacketsForMeNum           %d", radio.getDataPacketsForMeNum());
+                ESP_LOGI(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+                ESP_LOGI(TAG, "getDestinyUnreachableNum         %d", radio.getDestinyUnreachableNum());
+                ESP_LOGI(TAG, "getReceivedNotForMe              %d", radio.getReceivedNotForMe());
+                ESP_LOGI(TAG, "getReceivedPayloadBytes          %d", radio.getReceivedPayloadBytes());
+                ESP_LOGI(TAG, "getReceivedControlBytes          %d", radio.getReceivedControlBytes());
+                ESP_LOGI(TAG, "getSentPayloadBytes              %d", radio.getSentPayloadBytes());
+                ESP_LOGI(TAG, "getSentControlBytes              %d", radio.getSentControlBytes());
+                ESP_LOGI(TAG, "getReceivedTotalPackets          %d", radio.getReceivedTotalPacketsNum());
+                ESP_LOGI(TAG, "getHelperOnReceiveTriggerNum     %d", radio.getHelperOnReceiveTriggerNum());
+                break;
+            case 3:
+                ESP_LOGI(TAG, "u32LoopTaskCounter                       %d", u32LoopTaskCounter);
+                ESP_LOGI(TAG, "DebugHeapTimesGet                        %d", DebugHeapTimesGet());
+                ESP_LOGI(TAG, "Free heap:                               %d", getFreeHeap());
+                ESP_LOGI(TAG, "getOnReceiveEventsCounter                %d", radio.getOnReceiveEventsCounter());
+                ESP_LOGI(TAG, "u32HeardOurPackets                       %d", u32HeardOurPackets);
+                ESP_LOGI(TAG, "u32BroadcastPackets                      %d", u32BroadcastPackets);
+                ESP_LOGI(TAG, "u32NonBroadcastPackets                   %d", u32NonBroadcastPackets);
+                ESP_LOGI(TAG, "u32SkippedPrintfMemMalloc                %d", u32SkippedPrintfMemMalloc);
+                ESP_LOGI(TAG, "u32SkippedPrintfMemMallocBytes           %d", u32SkippedPrintfMemMallocBytes);
+                ESP_LOGI(TAG, "u32SkippedSerialQueueSend                %d", u32SkippedSerialQueueSend);
+                ESP_LOGI(TAG, "u32PrintfReceiveEventFlag                %d", u32PrintfReceiveEventFlag);
+                ESP_LOGI(TAG, "u32SkippedPrintfCirMalloc                %d", u32SkippedPrintfCirMalloc);
+                ESP_LOGI(TAG, "u32SkippedPrintfCirMallocBytes           %d", u32SkippedPrintfCirMallocBytes);
+                ESP_LOGI(TAG, "u32SkippedCircleQueueSend                %d", u32SkippedCircleQueueSend);
+                ESP_LOGI(TAG, "u32SkippedPrintfMemMallocFromCircle      %d", u32SkippedPrintfMemMallocFromCircle);
+                ESP_LOGI(TAG, "u32SkippedPrintfMemMallocBytesFromCircle %d", u32SkippedPrintfMemMallocBytesFromCircle);
+                ESP_LOGI(TAG, "u32SkippedSerialQueueSendFromCircle      %d", u32SkippedSerialQueueSendFromCircle);
+                break;
+            case 4:
+                printSubGHzInterruptPriority();
+                break;
+            case 5:
+                printTaskList();
+                break;
+            case 6:
+                DebugHeapPrint(true);
+                break;
+            case 7:
+                if (printDetailsLoopState >= ALLOCATION_COUNT)
+                {
+                    printDetailsLoopState = 0;
+                }
+                DebugHeapPrintPears((e_AllocationName_t)printDetailsLoopState, 32);
+                printDetailsLoopState++;
+                break;
+            case 8:
+                radio.printAllPacketsInSendQueue(10);
+                radio.printAllPacketsInRecvQueue(10);
+                radio.printAllPacketsInDataQueue(10);
+                break;
+            case 9:
+            
+                ESP_LOGI(TAG, "??????????????????????????????????????????????????");
+                ESP_LOGI(TAG, "getReSentPackets()               %d", radio.getReSentPackets());
+                ESP_LOGI(TAG, "getReceivedIAmViaNum             %d", radio.getReceivedIAmViaNum());
+                ESP_LOGI(TAG, "getSendRoutingTablePacketNum     %d", radio.getSendRoutingTablePacketNum());
+                ESP_LOGI(TAG, "getSendHelloPacketNum            %d", radio.getSendHelloPacketNum());
+                ESP_LOGI(TAG, "getSendRTRequestPacketNum        %d", radio.getSendRTRequestPacketNum());
+                ESP_LOGI(TAG, "getSendAckPacketNum              %d", radio.getSendAckPacketNum());
+                ESP_LOGI(TAG, "getSendLostPacketNum             %d", radio.getSendLostPacketNum());
+                ESP_LOGI(TAG, "getSendPacketSequenceNum         %d", radio.getSendPacketSequenceNum());
+                ESP_LOGI(TAG, "getSendAppPacketNum              %d", radio.getSendAppPacketNum());
+                ESP_LOGI(TAG, "getSendRandomTotalWait           %d ms", radio.getSendRandomTotalWait());
+
+
+                break;
+            case 10:
+                ESP_LOGI(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                ESP_LOGI(TAG, "previousBroadcastPayloads.size()         %d", previousBroadcastPayloads.size());
+                ESP_LOGI(TAG, "radio.routingTableSize()                 %d", radio.routingTableSize());
+                ESP_LOGI(TAG, "radio.q_WSP->getLength()                 %d", radio.q_WSP->getLength());
+                ESP_LOGI(TAG, "radio.q_WRP->getLength()                 %d", radio.q_WRP->getLength());
+                ESP_LOGI(TAG, "radio.ReceivedAppPackets->getLength()    %d", radio.ReceivedAppPackets->getLength());
+                ESP_LOGI(TAG, "radio.ReceivedPackets->getLength()       %d", radio.ReceivedPackets->getLength());
+                ESP_LOGI(TAG, "radio.ToSendPackets->getLength()         %d", radio.ToSendPackets->getLength());
+                ESP_LOGI(TAG, "routingTableList->getLength()            %d", RoutingTableService::routingTableList->getLength());
+
+                break;
+
+            case 11:
+                DebugTaskPrintStats();
+                break;
+            case 12:
+                ESP_LOGI(TAG, "TrackConvertedPacketsForMeNum    %d", radio.getTrackConvertedPacketsForMeNum());
+                ESP_LOGI(TAG, "TrackConvertedPacketsNotifyNum   %d", radio.getTrackConvertedPacketsNotifyNum());
+                ESP_LOGI(TAG, "trackConvertedPacketsToMainNum   %d", trackConvertedPacketsToMainNum);
+                break;
+            default:
+                printLoopState = -1;
+                break;
+        }
+        ESP_LOGI(TAG, "---!END!---");
+
+
+
+        printLoopState = 0;
+    }
+
 }

@@ -286,18 +286,18 @@ void DebugHeapOnFreeCheckAll(void* pData) {
 //#define TAG "HeapDebug"
 
 void DebugHeapPrint(bool skipUnused) {
-    ESP_LOGE(TAG, "\n[Heap Debugging Info]\n");
+    ESP_LOGI(TAG, "\n[Heap Debugging Info]\n");
 
     // Print compact header row
-    ESP_LOGE(TAG, "---------------------------------------------------------------------------------------");
-    ESP_LOGE(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now | A/F Fail|Skip|Cnt|");
-    ESP_LOGE(TAG, "---------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "---------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "| Type | TotAlloc | Freed  | Curr | Max | Min | Times | Free | Now | A/F Fail|Skip|Cnt|");
+    ESP_LOGI(TAG, "---------------------------------------------------------------------------------------");
 
     for (int i = 0; i < ALLOCATION_COUNT; i++) {
         s_AllocationData_t* allocData = &asDebugHeapAllocation[i];
         
         if (skipUnused == false || (int)allocData->u32SingleAllocationBytesMin >= 0)
-        ESP_LOGE(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u | %-2u/%-2u %-2u| %-3u|%-3u|",
+        ESP_LOGI(TAG, "| %-4d | %-8u | %-6u | %-4u | %-3u | %-3d | %-5u | %-4u | %-3u | %-2u/%-2u %-2u| %-3u|%-3u|",
                  i,
                  allocData->u32AllocatedBytesTotal,
                  allocData->u32FreedBytesTotal,
@@ -314,33 +314,33 @@ void DebugHeapPrint(bool skipUnused) {
                 nDebugHeapPairCount[i]
                  );
     }
-    ESP_LOGE(TAG, "---------------------------------------------------------------------------------------");
-    ESP_LOGE(TAG, "nNotMonitoredMemoryFreeTimes:        %d", nNotMonitoredMemoryFreeTimes);
-    ESP_LOGE(TAG, "u32DebugHeapOnFreeSkippedCheckAll:   %d", u32DebugHeapOnFreeSkippedCheckAll);
-    ESP_LOGE(TAG, "u32OnAllocationSkipPrintfCircle:     %d", u32OnAllocationSkipPrintfCircle);
-    ESP_LOGE(TAG, "u32OnAllocationSkipPrintfQueue:      %d", u32OnAllocationSkipPrintfQueue);
-    ESP_LOGE(TAG, "u32OnAllocationSkipAppPacket:        %d", u32OnAllocationSkipAppPacket);
-    ESP_LOGE(TAG, "u32OnAllocationSkipCopyPacket:       %d", u32OnAllocationSkipCopyPacket);
-    ESP_LOGE(TAG, "u32OnAllocationSkipRoutingTable:     %d", u32OnAllocationSkipRoutingTable);
-    ESP_LOGE(TAG, "u32OnAllocationSkipRoutingPacket:    %d", u32OnAllocationSkipRoutingPacket);
-    ESP_LOGE(TAG, "u32OnAllocationSkipControlPacket:    %d", u32OnAllocationSkipControlPacket);
-    ESP_LOGE(TAG, "u32OnAllocationSkipControlEmpty:     %d", u32OnAllocationSkipControlEmpty);
-    ESP_LOGE(TAG, "u32OnAllocationSkipUnknownPacket:    %d", u32OnAllocationSkipUnknownPacket);
-    ESP_LOGE(TAG, "u32OnFreePairNotFound:               %d", u32OnFreePairNotFound);
+    ESP_LOGI(TAG, "---------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "nNotMonitoredMemoryFreeTimes:        %d", nNotMonitoredMemoryFreeTimes);
+    ESP_LOGI(TAG, "u32DebugHeapOnFreeSkippedCheckAll:   %d", u32DebugHeapOnFreeSkippedCheckAll);
+    ESP_LOGI(TAG, "u32OnAllocationSkipPrintfCircle:     %d", u32OnAllocationSkipPrintfCircle);
+    ESP_LOGI(TAG, "u32OnAllocationSkipPrintfQueue:      %d", u32OnAllocationSkipPrintfQueue);
+    ESP_LOGI(TAG, "u32OnAllocationSkipAppPacket:        %d", u32OnAllocationSkipAppPacket);
+    ESP_LOGI(TAG, "u32OnAllocationSkipCopyPacket:       %d", u32OnAllocationSkipCopyPacket);
+    ESP_LOGI(TAG, "u32OnAllocationSkipRoutingTable:     %d", u32OnAllocationSkipRoutingTable);
+    ESP_LOGI(TAG, "u32OnAllocationSkipRoutingPacket:    %d", u32OnAllocationSkipRoutingPacket);
+    ESP_LOGI(TAG, "u32OnAllocationSkipControlPacket:    %d", u32OnAllocationSkipControlPacket);
+    ESP_LOGI(TAG, "u32OnAllocationSkipControlEmpty:     %d", u32OnAllocationSkipControlEmpty);
+    ESP_LOGI(TAG, "u32OnAllocationSkipUnknownPacket:    %d", u32OnAllocationSkipUnknownPacket);
+    ESP_LOGI(TAG, "u32OnFreePairNotFound:               %d", u32OnFreePairNotFound);
     
 }
 
 void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen) {
     if (eName >= ALLOCATION_COUNT) {
-        ESP_LOGE(TAG, "[ERROR] Invalid allocation type: %d", (int)eName);
+        ESP_LOGI(TAG, "[ERROR] Invalid allocation type: %d", (int)eName);
         return;
     }
 
     // Print a compact header
-    ESP_LOGE(TAG, "\n[Active Allocations for Type %d]\n", (int)eName);
-    ESP_LOGE(TAG, "------------------------------------------------------------------------------------------------------------------------------");
-    ESP_LOGE(TAG, "| Address  | Len | Pos | 00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 ... |");
-    ESP_LOGE(TAG, "------------------------------------------------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "\n[Active Allocations for Type %d]\n", (int)eName);
+    ESP_LOGI(TAG, "------------------------------------------------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "| Address  | Len | Pos | 00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 ... |");
+    ESP_LOGI(TAG, "------------------------------------------------------------------------------------------------------------------------------");
 
     if (xSemaphoreTake(semphrDebugHeapBusy, SEMAPHORE_WAIT_TICKS) == pdFALSE)
     {
@@ -367,12 +367,12 @@ void DebugHeapPrintPears(e_AllocationName_t eName, uint32_t maxDataLen) {
             }
 
             // Print the formatted line for the allocation
-            ESP_LOGE(TAG, "| %08X | %-3u | %-3u | %-99s |", (uintptr_t)pData, nSize, asDebugHeapPair[eName][j].nPosAllocate, dataBuffer);
+            ESP_LOGI(TAG, "| %08X | %-3u | %-3u | %-99s |", (uintptr_t)pData, nSize, asDebugHeapPair[eName][j].nPosAllocate, dataBuffer);
         }
         xSemaphoreGive(semphrDebugHeapBusy);
     }
 
-    ESP_LOGE(TAG, "------------------------------------------------------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "------------------------------------------------------------------------------------------------------------------------------");
 }
 
 void DebugHeapOnAllocationSkipPrintfCircle(void)
