@@ -5,7 +5,7 @@
 Packet<uint8_t>* PacketService::createEmptyPacket(size_t packetSize) {
     size_t maxPacketSize = PacketFactory::getMaxPacketSize();
     if (packetSize > maxPacketSize) {
-        ESP_LOGI(LM_TAG, "Trying to create a packet greater than %d bytes", maxPacketSize);
+        ESP_LOGE(LM_TAG, "Trying to create a packet greater than %d bytes", maxPacketSize);
         packetSize = maxPacketSize;
     }
 
@@ -22,7 +22,7 @@ Packet<uint8_t>* PacketService::createEmptyPacket(size_t packetSize) {
     }
     
 
-    ESP_LOGI(LM_TAG, "Packet created with %d bytes", packetSize);
+    ESP_LOGV(LM_TAG, "Packet created with %d bytes", packetSize);
 
     return p;
 
@@ -59,7 +59,7 @@ AppPacket<uint8_t>* PacketService::createAppPacket(uint16_t dst, uint16_t src, u
     }
     else {
         DebugHeapOnAllocationFail(ALLOCATION_APP_PACKET_CREATE_CONVERT, packetLength);
-        ESP_LOGW(LM_TAG, "User Packet not allocated");
+        ESP_LOGE(LM_TAG, "User Packet not allocated");
         return nullptr;
     }
 

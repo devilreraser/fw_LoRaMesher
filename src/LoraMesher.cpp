@@ -28,6 +28,7 @@ uint32_t processPacketsLoop = 0;
 uint32_t processPacketsLoopLast = 0;
 
 int last_error_radio = 0;
+int startReceivingError = 0;
 
 uint8_t dummy_buffer[256];
 
@@ -109,7 +110,7 @@ void LoraMesher::start() {
     #endif
 
     // Start Receiving
-    startReceiving(1);
+    startReceivingError = startReceiving(1);
 
     // Set previous priority
     vTaskPrioritySet(NULL, prevPriority);
@@ -337,13 +338,13 @@ int LoraMesher::startReceiving(int times_enter) {
     int res = radio->startReceive();
     if (res != 0) {
         last_error_radio = res;
-        ESP_LOGE(LM_TAG, "Starting receiving gave error: %d", res);
-        if (res == RADIOLIB_ERR_SPI_WRITE_FAILED) {
-            ESP_LOGW(LM_TAG, "SPI Write failed, restarting radio");
-            restartRadio();
-        }
+        // ESP_LOGE(LM_TAG, "Starting receiving gave error: %d", res);
+        // if (res == RADIOLIB_ERR_SPI_WRITE_FAILED) {
+        //     ESP_LOGW(LM_TAG, "SPI Write failed, restarting radio");
+        //     restartRadio();
+        // }
 
-        //restartRadio();
+        restartRadio();
         if(times_enter < 3)
         {
             return startReceiving(times_enter++);
@@ -406,7 +407,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        2048 + 2048 + 2048,  //for sure stack overflow with 4096 bytes
+        2048,  //for sure stack overflow with 4096 bytes when was recursion
         this,
         6,
         &ReceivePacket_TaskHandle);
@@ -480,7 +481,7 @@ ICACHE_RAM_ATTR
 void LoraMesher::onReceive(void) {
     LoraMesher::getInstance().setOnReceiveEventsFlag();
     LoraMesher::getInstance().incOnReceiveEventsCounter();
-    ESP_LOGI(LM_TAG, "LoraMesher::onReceive");
+    ESP_LOGV(LM_TAG, "LoraMesher::onReceive");
 
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET_NOTIFY_RECEIVE_DATA
@@ -530,6 +531,11 @@ void LoraMesher::helperRoutine() {
     for (;;) {
 
         DebugTaskCounter(pcTaskGetName(NULL));
+
+        if (startReceivingError)
+        {
+            startReceivingError = startReceiving(1);
+        }
 
         if (b_on_receive_notify)
         {
@@ -672,7 +678,7 @@ void LoraMesher::receivingRoutine() {
 
             }
 
-            startReceiving(1);
+            startReceivingError = startReceiving(1);
         }
     }
 }
@@ -716,24 +722,24 @@ void LoraMesher::waitBeforeSend(uint8_t repeatedDetectPreambles) {
     randomDelayTotal += randomDelay;
     incSendRandomTotalWait(randomDelay);
 
-    ESP_LOGE(LM_TAG, "RandomDelay     %d ms", (int) randomDelay);
+    ESP_LOGV(LM_TAG, "RandomDelay     %d ms", (int) randomDelay);
     uint32_t filteredRandomDelayValue = filter.filter(randomDelay);
-    ESP_LOGE(LM_TAG, "RandomDelayFilt %d ms", (int) filteredRandomDelayValue);
+    ESP_LOGV(LM_TAG, "RandomDelayFilt %d ms", (int) filteredRandomDelayValue);
 
     //Set a random delay, to avoid some collisions.
     vTaskDelay(randomDelay / portTICK_PERIOD_MS);
 
     if (hasReceivedMessage) {
-        startReceiving(1);
+        startReceivingError = startReceiving(1);
         ESP_LOGV(LM_TAG, "Preamble detected while waiting %d", repeatedDetectPreambles);
         waitBeforeSend(repeatedDetectPreambles + 1);
     }
 
     if (repeatedDetectPreambles == 1)
     {
-        ESP_LOGE(LM_TAG, "randomDelayTotal     %d ms", (int) randomDelayTotal);
+        ESP_LOGV(LM_TAG, "randomDelayTotal     %d ms", (int) randomDelayTotal);
         uint32_t randomDelayTotalFilt = filterTotal.filter(randomDelayTotal);
-        ESP_LOGE(LM_TAG, "randomDelayTotalFilt %d ms", (int) randomDelayTotalFilt);
+        ESP_LOGV(LM_TAG, "randomDelayTotalFilt %d ms", (int) randomDelayTotalFilt);
     }
 }
 
@@ -747,11 +753,11 @@ void LoraMesher::printAllPacketsInSendQueue(int maxPrintCount = 10) {
 
     if (ToSendPackets->moveToStart()) {
         int totalPackets = ToSendPackets->getLength();  // Get the total number of packets in the queue
-        ESP_LOGE(LM_TAG, "Total packets in the Send queue: %d", totalPackets);
+        ESP_LOGI(LM_TAG, "Total packets in the Send queue: %d", totalPackets);
 
         do {
             if (count >= maxPrintCount) {
-                ESP_LOGE(LM_TAG, "Send Print limit reached. Showing first %d packets only.", maxPrintCount);
+                ESP_LOGI(LM_TAG, "Send Print limit reached. Showing first %d packets only.", maxPrintCount);
                 break;  // Stop printing if the maximum print count is reached
             }
 
@@ -767,7 +773,7 @@ void LoraMesher::printAllPacketsInSendQueue(int maxPrintCount = 10) {
             }
 
             // Print packet details
-            ESP_LOGE(LM_TAG, "Num: %d Pri: %2d Try: %d Sz: %2d, Src: %X, Dst: %X, Type: %3d, Id: %3d, Data: %s",
+            ESP_LOGI(LM_TAG, "Num: %d Pri: %2d Try: %d Sz: %2d, Src: %X, Dst: %X, Type: %3d, Id: %3d, Data: %s",
                     current->number,
                     current->priority,
                     current->resend,
@@ -781,7 +787,7 @@ void LoraMesher::printAllPacketsInSendQueue(int maxPrintCount = 10) {
             count++;  // Increment the printed packet count
         } while (ToSendPackets->next());  // Move to next packet
     } else {
-        ESP_LOGE(LM_TAG, "No packets in the Send queue.");
+        ESP_LOGI(LM_TAG, "No packets in the Send queue.");
     }
 
     ToSendPackets->releaseInUse();  // Release the queue lock
@@ -793,11 +799,11 @@ void LoraMesher::printAllPacketsInRecvQueue(int maxPrintCount = 10) {
 
     if (ReceivedPackets->moveToStart()) {
         int totalPackets = ReceivedPackets->getLength();  // Get the total number of packets in the queue
-        ESP_LOGE(LM_TAG, "Total packets in the Recv queue: %d", totalPackets);
+        ESP_LOGI(LM_TAG, "Total packets in the Recv queue: %d", totalPackets);
 
         do {
             if (count >= maxPrintCount) {
-                ESP_LOGE(LM_TAG, "Recv Print limit reached. Showing first %d packets only.", maxPrintCount);
+                ESP_LOGI(LM_TAG, "Recv Print limit reached. Showing first %d packets only.", maxPrintCount);
                 break;  // Stop printing if the maximum print count is reached
             }
 
@@ -805,7 +811,7 @@ void LoraMesher::printAllPacketsInRecvQueue(int maxPrintCount = 10) {
             Packet<uint8_t>* packet = current->packet;
 
             // Print packet details
-            ESP_LOGE(LM_TAG, "Recv Packet -- Size: %d, Src: %X, Dst: %X, Type: %d, Id: %d",
+            ESP_LOGI(LM_TAG, "Recv Packet -- Size: %d, Src: %X, Dst: %X, Type: %d, Id: %d",
                      packet->packetSize,
                      packet->src,
                      packet->dst,
@@ -815,7 +821,7 @@ void LoraMesher::printAllPacketsInRecvQueue(int maxPrintCount = 10) {
             count++;  // Increment the printed packet count
         } while (ReceivedPackets->next());  // Move to next packet
     } else {
-        ESP_LOGE(LM_TAG, "No packets in the Recv queue.");
+        ESP_LOGI(LM_TAG, "No packets in the Recv queue.");
     }
 
     ReceivedPackets->releaseInUse();  // Release the queue lock
@@ -828,18 +834,18 @@ void LoraMesher::printAllPacketsInDataQueue(int maxPrintCount = 10) {
 
     if (ReceivedAppPackets->moveToStart()) {
         int totalPackets = ReceivedAppPackets->getLength();  // Get the total number of packets in the queue
-        ESP_LOGE(LM_TAG, "Total packets in the Data queue: %d", totalPackets);
+        ESP_LOGI(LM_TAG, "Total packets in the Data queue: %d", totalPackets);
 
         do {
             if (count >= maxPrintCount) {
-                ESP_LOGE(LM_TAG, "Data Print limit reached. Showing first %d packets only.", maxPrintCount);
+                ESP_LOGI(LM_TAG, "Data Print limit reached. Showing first %d packets only.", maxPrintCount);
                 break;  // Stop printing if the maximum print count is reached
             }
 
             AppPacket<uint8_t>* current = ReceivedAppPackets->getCurrent();
 
             // Print packet details
-            ESP_LOGE(LM_TAG, "Data Packet -- Size: %d, Src: %X, Dst: %X, Data[0]: %02X, Data[1]: %02X, Data[2]: %02X, Data[3]: %02X",
+            ESP_LOGI(LM_TAG, "Data Packet -- Size: %d, Src: %X, Dst: %X, Data[0]: %02X, Data[1]: %02X, Data[2]: %02X, Data[3]: %02X",
                      current->payloadSize,
                      current->src,
                      current->dst,
@@ -851,7 +857,7 @@ void LoraMesher::printAllPacketsInDataQueue(int maxPrintCount = 10) {
             count++;  // Increment the printed packet count
         } while (ReceivedAppPackets->next());  // Move to next packet
     } else {
-        ESP_LOGE(LM_TAG, "No packets in the Data queue.");
+        ESP_LOGI(LM_TAG, "No packets in the Data queue.");
     }
 
     ReceivedAppPackets->releaseInUse();  // Release the queue lock
@@ -870,7 +876,7 @@ bool LoraMesher::sendPacket(Packet<uint8_t>* p) {
     int resT = radio->transmit(reinterpret_cast<uint8_t*>(p), p->packetSize);
 
     //Start receiving again after sending a packet
-    startReceiving(1);
+    startReceivingError = startReceiving(1);
 
     if (resT != RADIOLIB_ERR_NONE) {
         ESP_LOGE(LM_TAG, "Transmit gave error: %d", resT);
@@ -912,7 +918,6 @@ void LoraMesher::sendPackets() {
             ToSendPackets->setInUse();
 
             ESP_LOGV(LM_TAG, "Size of Send Packets Queue: %d", ToSendPackets->getLength());
-            ESP_LOGE(LM_TAG, "Size of Send Packets Queue: %d", ToSendPackets->getLength());
 
             QueuePacket<Packet<uint8_t>>* tx = ToSendPackets->Pop();
 
@@ -920,7 +925,6 @@ void LoraMesher::sendPackets() {
 
             if (tx) {
                 ESP_LOGV(LM_TAG, "Send n. %d", sendCounter);
-                ESP_LOGE(LM_TAG, "Send n. %d", sendCounter);
 
                 if (tx->packet->src == getLocalAddress())
                     tx->packet->id = sendId++;
@@ -961,16 +965,16 @@ void LoraMesher::sendPackets() {
                 bool noLimitLength = (ToSendPackets->getLength() < MAX_SEND_PACKET_QUEUE_SIZE);
                 bool noLimitTimeout = ((int32_t)(tx->timeout - xTaskGetTickCount()) > 0);
 
-                ESP_LOGE(LM_TAG, "tx->timeout:%lu xTaskGetTickCount():%lu", tx->timeout, xTaskGetTickCount());
-                ESP_LOGE(LM_TAG, "noLimitResend:%d noLimitLength:%d noLimitTimeout:%d", (int) noLimitResend, (int) noLimitLength, (int) noLimitTimeout);
+                ESP_LOGD(LM_TAG, "tx->timeout:%lu xTaskGetTickCount():%lu", tx->timeout, xTaskGetTickCount());
+                ESP_LOGD(LM_TAG, "noLimitResend:%d noLimitLength:%d noLimitTimeout:%d", (int) noLimitResend, (int) noLimitLength, (int) noLimitTimeout);
 
                 if (!hasSend) 
                 {
-                    ESP_LOGE(LM_TAG, "Message %d Not Sent", (int) sendCounter);
+                    ESP_LOGD(LM_TAG, "Message %d Not Sent", (int) sendCounter);
 
             
                     if(noLimitResend && noLimitLength && noLimitTimeout) {
-                        ESP_LOGE(LM_TAG, "Message %d Retry", (int) sendCounter);
+                        ESP_LOGW(LM_TAG, "Message %d Retry", (int) sendCounter);
 
                         tx->priority = MAX_PRIORITY;
                         tx->resend++;
@@ -986,7 +990,7 @@ void LoraMesher::sendPackets() {
                 }
                 else
                 {
-                    ESP_LOGE(LM_TAG, "Message %d Sent", (int) sendCounter);
+                    ESP_LOGD(LM_TAG, "Message %d Sent", (int) sendCounter);
                 }
 
 
@@ -997,7 +1001,6 @@ void LoraMesher::sendPackets() {
                 TickType_t delayBetweenSend = timeOnAir * dutyCycleEvery;
 
                 ESP_LOGV(LM_TAG, "TimeOnAir %d ms, next message in %d ms", (int) timeOnAir, (int) delayBetweenSend);
-                ESP_LOGE(LM_TAG, "TimeOnAir %d ms, next message in %d ms", (int) timeOnAir, (int) delayBetweenSend);
 
                 PacketQueueService::deleteQueuePacketAndPacket(tx);
 
@@ -1636,7 +1639,7 @@ size_t LoraMesher::getSendQueueSize() {
 
 void LoraMesher::addToSendOrderedAndNotify(QueuePacket<Packet<uint8_t>>* qp) {
     PacketQueueService::addOrdered(ToSendPackets, qp);
-    ESP_LOGI(LM_TAG, "Added packet to Q_SP, notifying sender task");
+    ESP_LOGD(LM_TAG, "Added packet to Q_SP, notifying sender task");
 
     //Notify the sendData task handle
     xTaskNotify(SendData_TaskHandle, 0, eSetValueWithOverwrite);

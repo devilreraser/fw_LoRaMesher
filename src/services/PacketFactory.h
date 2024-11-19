@@ -158,7 +158,7 @@ public:
             memcpy(reinterpret_cast<void*>((unsigned long) p + (sizeof(T))), payload, payloadSize);
         }
 
-        ESP_LOGI(LM_TAG, "Packet created with %d bytes", packetSize);
+        ESP_LOGV(LM_TAG, "Packet created with %d bytes", packetSize);
 
         return p;
     };
