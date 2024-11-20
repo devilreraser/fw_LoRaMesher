@@ -606,9 +606,9 @@ void serialTask(void *pvParameters) {
             if (print_alive_counter >= print_alive_timeout)
             {
                 Serial.print("serialTask Idles\r\n");
+                print_alive_counter = 0;
             }
         }
-
 
         if (Serial.available() > 0) {
             char c = Serial.read();  // Read the first character
@@ -653,7 +653,7 @@ extern "C" void vApplicationMallocFailedHook( void )
 uint32_t timesStackOverflow = 0;
 uint32_t timesStackOverflowReceivingRoutine = 0;
 extern "C" void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName) {
-    ESP_LOGE(TAG, "Stack Overflow for task %s", pcTaskName);
+    //ESP_LOGE(TAG, "Stack Overflow for task %s", pcTaskName);
     timesStackOverflow++;
     if (strcmp(pcTaskName, "Receiving routine") == 0)
     {
@@ -1807,6 +1807,12 @@ void console_response(void)
                 ESP_LOGI(TAG, "TrackConvertedPacketsForMeNum    %d", radio.getTrackConvertedPacketsForMeNum());
                 ESP_LOGI(TAG, "TrackConvertedPacketsNotifyNum   %d", radio.getTrackConvertedPacketsNotifyNum());
                 ESP_LOGI(TAG, "trackConvertedPacketsToMainNum   %d", trackConvertedPacketsToMainNum);
+                break;
+            case 13:
+                ESP_LOGI(TAG, "restartRadioCount                    %d", radio.getRestartRadioCount());
+                ESP_LOGI(TAG, "timesStackOverflow                   %d", timesStackOverflow);
+                ESP_LOGI(TAG, "timesStackOverflowReceivingRoutine   %d", timesStackOverflowReceivingRoutine);
+                ESP_LOGI(TAG, "timesMallocFailed                    %d", timesMallocFailed);
                 break;
             default:
                 printLoopState = -1;

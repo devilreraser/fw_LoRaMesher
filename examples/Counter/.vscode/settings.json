@@ -29,6 +29,7 @@
         "mutex": "cpp",
         "algorithm": "cpp",
         "stdint.h": "c",
-        "task.h": "c"
+        "task.h": "c",
+        "stop_token": "cpp"
     }
 }
