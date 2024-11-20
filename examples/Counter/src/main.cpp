@@ -650,6 +650,18 @@ extern "C" void vApplicationMallocFailedHook( void )
     timesMallocFailed++;
 }
 
+uint32_t timesStackOverflow = 0;
+uint32_t timesStackOverflowReceivingRoutine = 0;
+extern "C" void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName) {
+    ESP_LOGE(TAG, "Stack Overflow for task %s", pcTaskName);
+    timesStackOverflow++;
+    if (strcmp(pcTaskName, "Receiving routine") == 0)
+    {
+        timesStackOverflowReceivingRoutine++;
+        radio.setResetReceiveRoutineTask();
+    }
+
+}
 
 void printTaskList() {
     // Allocate a buffer for task list
