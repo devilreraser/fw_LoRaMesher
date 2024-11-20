@@ -163,6 +163,7 @@ void LoraMesher::setConfig(LoraMesherConfig config) {
 void LoraMesher::restartRadio() {
     radio->reset();
     initializeLoRa();
+    incRestartRadioCount();
 
     ESP_LOGI(LM_TAG, "Restarting radio DONE");
 }
@@ -350,7 +351,7 @@ int LoraMesher::startReceiving(int times_enter) {
         restartRadio();
         if(times_enter < 3)
         {
-            return startReceiving(times_enter++);
+            return startReceiving(times_enter + 1);
         }
         else
         {

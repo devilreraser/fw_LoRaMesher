@@ -499,6 +499,7 @@ public:
 
     bool getResetReceiveRoutineTask() { return resetReceiveRoutineTask; }
 
+    uint32_t getRestartRadioCount() { return restartRadioCount; }
 
     /**
      * @brief Defines that the node is a gateway. WARNING: Changing the role frequently can cause problems in the network.
@@ -777,6 +778,8 @@ private:
     void clrResetReceiveRoutineTask() { resetReceiveRoutineTask = false; }
 
 
+    uint32_t restartRadioCount = 0;  // Definition and initialization
+    void incRestartRadioCount() { restartRadioCount++; }
 
     /**
      * @brief Function that process the packets inside Received Packets
