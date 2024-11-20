@@ -497,6 +497,7 @@ public:
     uint32_t getSendAppPacketNum() { return u32SendAppPacketNum; }
     uint32_t getSendRandomTotalWait() { return u32SendRandomTotalWait; }
 
+    bool getResetReceiveRoutineTask() { return resetReceiveRoutineTask; }
 
 
     /**
@@ -770,6 +771,10 @@ private:
 
     uint32_t u32SendRandomTotalWait = 0;  // Definition and initialization
     void incSendRandomTotalWait(uint32_t time_ms) { u32SendRandomTotalWait += time_ms; }
+
+    bool resetReceiveRoutineTask = 0;  // Definition and initialization
+    void setResetReceiveRoutineTask() { resetReceiveRoutineTask = true; }
+    void clrResetReceiveRoutineTask() { resetReceiveRoutineTask = false; }
 
 
 

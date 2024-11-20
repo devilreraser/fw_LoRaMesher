@@ -68,7 +68,8 @@ void LoraMesher::standby() {
 
     //Suspend all tasks
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET
-    vTaskSuspend(ReceivePacket_TaskHandle);
+    if (ReceivePacket_TaskHandle)
+        vTaskSuspend(ReceivePacket_TaskHandle);
     #endif
     vTaskSuspend(Hello_TaskHandle);
     #ifndef DEBUG_NO_USE_RECEIVE_DATA
@@ -95,7 +96,8 @@ void LoraMesher::start() {
 
     // Resume all tasks
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET
-    vTaskResume(ReceivePacket_TaskHandle);
+    if (ReceivePacket_TaskHandle)
+        vTaskResume(ReceivePacket_TaskHandle);
     #endif
     vTaskResume(Hello_TaskHandle);
     #ifndef DEBUG_NO_USE_RECEIVE_DATA
@@ -118,7 +120,8 @@ void LoraMesher::start() {
 
 LoraMesher::~LoraMesher() {
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET
-    vTaskDelete(ReceivePacket_TaskHandle);
+    if (ReceivePacket_TaskHandle)
+        vTaskDelete(ReceivePacket_TaskHandle);
     #endif
     vTaskDelete(Hello_TaskHandle);
     #ifndef DEBUG_NO_USE_RECEIVE_DATA
@@ -407,7 +410,7 @@ void LoraMesher::initializeSchedulers() {
     res = xTaskCreate(
         [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
         "Receiving routine",
-        2048,  //for sure stack overflow with 4096 bytes when was recursion
+        2048 + 2048,  //for sure stack overflow with 2048 bytes when was recursion
         this,
         6,
         &ReceivePacket_TaskHandle);
@@ -487,28 +490,37 @@ void LoraMesher::onReceive(void) {
     #ifndef DEBUG_NO_USE_RECEIVE_PACKET_NOTIFY_RECEIVE_DATA
 
     #if defined(ESP32)    
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xHigherPriorityTaskWoken = xTaskNotifyFromISR(
-        LoraMesher::getInstance().ReceivePacket_TaskHandle,
-        0,
-        eSetValueWithoutOverwrite,
-        &xHigherPriorityTaskWoken);
-    portYIELD_FROM_ISR();
+    if (LoraMesher::getInstance().ReceivePacket_TaskHandle)
+    {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xHigherPriorityTaskWoken = xTaskNotifyFromISR(
+            LoraMesher::getInstance().ReceivePacket_TaskHandle,
+            0,
+            eSetValueWithoutOverwrite,
+            &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR();
+    }
     #else
     
     #ifdef ON_RECEIVE_NOTIFY_WITH_BOOL
     b_on_receive_notify = true;
     #else
     #if 0
-    xTaskNotify(LoraMesher::getInstance().ReceivePacket_TaskHandle, 0, eSetValueWithoutOverwrite);
+    if (LoraMesher::getInstance().ReceivePacket_TaskHandle)
+    {
+        xTaskNotify(LoraMesher::getInstance().ReceivePacket_TaskHandle, 0, eSetValueWithoutOverwrite);
+    }
     #else
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xHigherPriorityTaskWoken = xTaskNotifyFromISR(
-        LoraMesher::getInstance().ReceivePacket_TaskHandle,
-        0,
-        eSetValueWithoutOverwrite,
-        &xHigherPriorityTaskWoken);
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    if (LoraMesher::getInstance().ReceivePacket_TaskHandle)
+    {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xHigherPriorityTaskWoken = xTaskNotifyFromISR(
+            LoraMesher::getInstance().ReceivePacket_TaskHandle,
+            0,
+            eSetValueWithoutOverwrite,
+            &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
     #endif
     #endif
     #endif
@@ -537,17 +549,39 @@ void LoraMesher::helperRoutine() {
             startReceivingError = startReceiving(1);
         }
 
+        if (getResetReceiveRoutineTask())
+        {
+            clrResetReceiveRoutineTask();
+            if (ReceivePacket_TaskHandle)
+            {
+                vTaskDelete(ReceivePacket_TaskHandle);
+                int res;
+                res = xTaskCreate(
+                    [](void* o) { static_cast<LoraMesher*>(o)->receivingRoutine(); },
+                    "Receiving routine",
+                    2048 + 2048,  //for sure stack overflow with 2048 bytes when was recursion
+                    this,
+                    6,
+                    &ReceivePacket_TaskHandle);
+
+            }
+            
+        }
+
         if (b_on_receive_notify)
         {
             incHelperOnReceiveTriggerNum();
             b_on_receive_notify = false;
-            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            xHigherPriorityTaskWoken = xTaskNotifyFromISR(
-                LoraMesher::getInstance().ReceivePacket_TaskHandle,
-                0,
-                eSetValueWithoutOverwrite,
-                &xHigherPriorityTaskWoken);
-            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+            if(LoraMesher::getInstance().ReceivePacket_TaskHandle)
+            {
+                BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+                xHigherPriorityTaskWoken = xTaskNotifyFromISR(
+                    LoraMesher::getInstance().ReceivePacket_TaskHandle,
+                    0,
+                    eSetValueWithoutOverwrite,
+                    &xHigherPriorityTaskWoken);
+                portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+            }
             
         }
 
