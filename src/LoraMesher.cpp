@@ -29,6 +29,8 @@ uint32_t processPacketsLoopLast = 0;
 
 int last_error_radio = 0;
 int startReceivingError = 0;
+int resetRadioOnSendingErrorTimes = 0;
+int last_error_radio_on_send = 0;
 
 uint8_t dummy_buffer[256];
 
@@ -909,6 +911,13 @@ bool LoraMesher::sendPacket(Packet<uint8_t>* p) {
 
     //Blocking transmit, it is necessary due to deleting the packet after sending it. 
     int resT = radio->transmit(reinterpret_cast<uint8_t*>(p), p->packetSize);
+
+    if ((resT == -707) || (resT == -706)) { //RADIOLIB_ERR_SPI_CMD_FAILED RADIOLIB_ERR_SPI_CMD_INVALID
+        last_error_radio_on_send = resT;
+        resetRadioOnSendingErrorTimes++;
+        restartRadio();        
+    }
+
 
     //Start receiving again after sending a packet
     startReceivingError = startReceiving(1);
