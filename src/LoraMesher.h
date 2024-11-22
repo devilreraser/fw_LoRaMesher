@@ -909,6 +909,7 @@ private:
      * @param title Title to print the header
      */
     void printHeaderPacket(const char* tag, Packet<uint8_t>* p, String title);
+    void printPacket(const char* tag, Packet<uint8_t>* p, String title);
 
     /**
      * @brief Process a large payload packet

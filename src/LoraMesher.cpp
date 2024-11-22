@@ -650,8 +650,8 @@ void LoraMesher::receivingRoutine() {
                 {
                     rssi = (int8_t) round(radio->getRSSI());
                     snr = (int8_t) round(radio->getSNR());
-
-                    ESP_LOGI(LM_TAG, "Receiving LoRa packet: Size: %d bytes RSSI: %d SNR: %d", packetSize, rssi, snr);
+                    //Note! rssi of rx packet info
+                    ESP_LOGD(LM_TAG, "Receiving LoRa packet: Size: %d bytes RSSI: %d SNR: %d", packetSize, rssi, snr);
 
                     size_t max_packet_size = PacketFactory::getMaxPacketSize();
                     if (packetSize > max_packet_size) {
@@ -908,6 +908,7 @@ bool LoraMesher::sendPacket(Packet<uint8_t>* p) {
 
     // Print the packet to be sent
     printHeaderPacket(LM_TAG, p, "TX");
+    printPacket(LM_TAG, p, "TX");
 
     //Blocking transmit, it is necessary due to deleting the packet after sending it. 
     int resT = radio->transmit(reinterpret_cast<uint8_t*>(p), p->packetSize);
@@ -1237,6 +1238,7 @@ void LoraMesher::processPackets() {
 #endif
                 ESP_LOGV(PP_TAG, "Procesing packet ReceivedPackets->Pop() ok");
                 printHeaderPacket(PP_TAG, rx->packet, "RX");
+                printPacket(LM_TAG, rx->packet, "RX");
 
                 processPacketsState = 10;
                 recordState(LM_StateType::STATE_TYPE_RECEIVED, rx->packet);
@@ -1414,6 +1416,30 @@ void LoraMesher::printHeaderPacket(const char* tag, Packet<uint8_t>* p, String t
         isControlPacket ? (reinterpret_cast<ControlPacket*>(p))->number : 0);
 }
 
+void LoraMesher::printPacket(const char* tag, Packet<uint8_t>* p, String title) {
+    bool isDataPacket = PacketService::isDataPacket(p->type);
+    bool isControlPacket = PacketService::isControlPacket(p->type);
+
+    ESP_LOGI(tag, "Packet %s Sz: %2d Src: %X Dst: %X Id: %3d Typ: %18s Via: %04X Seq: %d Num: %3d Data: %02x %02x %02x %02x %02x %02x %02x %02x",
+        title.c_str(),
+        p->packetSize,
+        p->src,
+        p->dst,
+        p->id,
+        getPacketType(p->type),
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->via : 0,
+        isControlPacket ? (reinterpret_cast<ControlPacket*>(p))->seq_id : 0,
+        isControlPacket ? (reinterpret_cast<ControlPacket*>(p))->number : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[0] : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[1] : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[2] : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[3] : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[4] : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[5] : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[6] : 0,
+        isDataPacket ? (reinterpret_cast<DataPacket*>(p))->payload[7] : 0);
+}
+
 void LoraMesher::sendReliablePacket(uint16_t dst, uint8_t* payload, uint32_t payloadSize) {
     // Cannot send an empty packet
     if (payloadSize == 0)
@@ -1510,8 +1536,8 @@ void LoraMesher::processDataPacket(QueuePacket<DataPacket>* pq) {
     DataPacket* packet = pq->packet;
 
     incReceivedDataPackets();
-
-    ESP_LOGI(PP_TAG, "Data packet from %X, destination %X, via %X", packet->src, packet->dst, packet->via);
+    //Note! rx data packet info
+    ESP_LOGD(PP_TAG, "Data packet from %X, destination %X, via %X", packet->src, packet->dst, packet->via);
     ESP_LOGV(PP_TAG, "Data packet from %X, destination %X, via %X, Data: %02X %02X %02X %02X", packet->src, packet->dst, packet->via, packet->payload[0], packet->payload[1], packet->payload[2], packet->payload[3]);
 
     if (packet->dst == getLocalAddress()) {

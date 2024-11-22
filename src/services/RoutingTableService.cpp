@@ -170,10 +170,12 @@ bool RoutingTableService::updateMetric(RouteNode* rNode, uint8_t hops, uint8_t r
 }
 
 bool RoutingTableService::processHelloPacket(HelloPacket* p, int8_t receivedSNR, Packet<uint8_t>** out_send_packet) {
-    ESP_LOGI(RT_TAG, "Hello packet from %X with RTId %d and size %d", p->src, p->routingTableId, p->routingTableSize);
+    //Note! rx hello packet info
+    ESP_LOGD(RT_TAG, "Hello packet from %X with RTId %d and size %d", p->src, p->routingTableId, p->routingTableSize);
 
     if (p->routingTableId < routingTableId) {
-        ESP_LOGI(RT_TAG, "Hello packet from %X with old RTId %d", p->src, p->routingTableId);
+        //Note! rx hello packet info old RTId
+        ESP_LOGD(RT_TAG, "Hello packet from %X with old RTId %d", p->src, p->routingTableId);
         return false;
     }
 
@@ -224,7 +226,8 @@ bool RoutingTableService::processHelloPacket(HelloPacket* p, int8_t receivedSNR,
 
 
     if (p->routingTableId > routingTableId || p->routingTableSize != routingTableSize()) {
-        ESP_LOGI(RT_TAG, "Hello packet from %X with different RTId %d or RTSize", p->src, p->routingTableId, p->routingTableSize);
+        //Note! rx hello packet info different than current
+        ESP_LOGD(RT_TAG, "Hello packet from %X with different RTId %d or RTSize", p->src, p->routingTableId, p->routingTableSize);
         ESP_LOGV(RT_TAG, "Current RTId %d and RTSize %d", routingTableId, routingTableSize());
         // Ask for the updated routing table
         RTRequestPacket* rtRequestPacket = PacketService::createRoutingTableRequestPacket(p->src, WiFiService::getLocalAddress());
@@ -246,7 +249,8 @@ bool RoutingTableService::processRoute(RoutePacket* p, int8_t receivedSNR) {
     routingTableList->setInUse();
 
     size_t numNodes = p->getNetworkNodesSize();
-    ESP_LOGI(RT_TAG, "Route packet from %X with RTId %d size %d", p->src, p->routingTableId, numNodes);
+    //Note! Route Packet info
+    ESP_LOGD(RT_TAG, "Route packet from %X with RTId %d size %d", p->src, p->routingTableId, numNodes);
 
     NetworkNode* receivedNode = new NetworkNode(p->src, LM_MAX_METRIC, p->nodeRole, 1);
     rt_updated = processRoute(p->src, receivedNode, receivedSNR);
