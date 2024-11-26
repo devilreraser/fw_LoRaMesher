@@ -14,6 +14,8 @@
 #include "queue.h"
 #endif
 
+#include "adc.h"
+
 /* Section below For Task Debugging - Comment out for normal operation */
 //#define DEBUG_NO_USE_RECEIVED_APP_MESSAGES      
 
@@ -1574,6 +1576,8 @@ void setup() {
         ESP_LOGE("main", "Blink Task creation gave error: %d", res);
     }
     #endif
+
+    adc_dma_initialization();
 
     printf("initBoard \r\n");
     ESP_LOGI("main", "configMINIMAL_STACK_SIZE: %d", configMINIMAL_STACK_SIZE);
