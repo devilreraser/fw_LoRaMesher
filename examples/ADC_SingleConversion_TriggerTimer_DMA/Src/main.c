@@ -191,12 +191,12 @@ int main(void)
     Generate_waveform_SW_update();
     
     /* Wait for event on push button to perform following actions */
-    while ((ubUserButtonClickEvent) == RESET)
-    {
-    }
+//    while ((ubUserButtonClickEvent) == RESET)
+//    {
+//    }
     /* Reset variable for next loop iteration (with debounce) */
     HAL_Delay(200);
-    ubUserButtonClickEvent = RESET;
+//    ubUserButtonClickEvent = RESET;
     
     /* Note: Variable "ubUserButtonClickEvent" is set into push button        */
     /*       IRQ handler, refer to function "HAL_GPIO_EXTI_Callback()".       */

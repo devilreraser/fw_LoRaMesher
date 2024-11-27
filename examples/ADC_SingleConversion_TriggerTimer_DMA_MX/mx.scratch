@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<ScratchFile FileVersion="3.0">
+  <FileVersion>3.0</FileVersion>
+  <Workspace>
+    <WorkspaceType>Single-project</WorkspaceType>
+    <WorkspacePath>C:\repo\LoRaMesher\examples\ADC_SingleConversion_TriggerTimer_DMA\</WorkspacePath>
+    <underRoot>false</underRoot>
+    <TrustZone>0</TrustZone>
+    <HAL_Driver>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0</HAL_Driver>
+    <CMSIS>Drivers/CMSIS</CMSIS>
+    <Toolchain>STM32CubeIDE</Toolchain>
+    <IocFile>ADC_SingleConversion_TriggerTimer_DMA.ioc</IocFile>
+    <Project>
+              
+      <ProjectName>ADC_SingleConversion_TriggerTimer_DMA</ProjectName>
+           
+      <ProjectNature>C</ProjectNature>
+       
+      <Secure/>
+            
+      <filestoremove>
+                
+        <file>
+                      
+          <name>stm32wlxx_it.h</name>
+                  
+        </file>
+        <file>
+                      
+          <name>stm32wlxx_hal_conf.h</name>
+                  
+        </file>
+        <file>
+                      
+          <name>main.h</name>
+                  
+        </file>
+                           
+      </filestoremove>
+          
+      <configs>
+        <config>
+              
+          <name>ADC_SingleConversion_TriggerTimer_DMA</name>
+          	 
+          <mainSourceRepo>Src</mainSourceRepo>
+             
+          <sourceStructure>Basic</sourceStructure>
+           
+          <device>STM32WL55JCIx</device>
+          		     
+          <cpucore>ARM Cortex-M4</cpucore>
+                  
+          <fpu>None</fpu>
+                
+          <memories>
+                       
+            <memory access="xrw" name="SRAM1" size="16384" start="0x20000000"/>
+                    
+            <memory access="xrw" name="SRAM2" size="16384" start="0x20008000"/>
+                    
+            <memory access="rx" name="FLASH" size="131072" start="0x8000000"/>
+                
+          </memories>
+              
+          <startup>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\CMSIS\Device\ST\STM32WLxx\Source\Templates\gcc\startup_stm32wl55xx_cm4.s</startup>
+                
+          <LinkSettings>
+            	
+            <LinkAdditionalLibs>	</LinkAdditionalLibs>
+          </LinkSettings>
+              
+          <heapSize>0x200</heapSize>
+              
+          <stackSize>0x400</stackSize>
+                  
+          <cpuclock>48</cpuclock>
+                  
+          <board>custom</board>
+              
+          <optimization/>
+              
+          <Aincludes>
+                    
+            <include/>
+                    
+          </Aincludes>
+              
+          <Adefines>        </Adefines>
+                
+          <Cdefines>
+                    
+            <define>CORE_CM4</define>
+                    
+            <define>USE_HAL_DRIVER</define>
+                    
+            <define>STM32WL55xx</define>
+                    
+          </Cdefines>
+              
+          <Ldefines>        </Ldefines>
+                  
+          <Cincludes>
+            		        
+            <include>Inc</include>
+                    
+            <include>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Inc</include>
+                    
+            <include>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Inc\Legacy</include>
+                    
+            <include>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\CMSIS\Device\ST\STM32WLxx\Include</include>
+                    
+            <include>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\CMSIS\Include</include>
+                    
+            <include>..\..\..\..\..\..\Drivers\BSP\STM32WLxx_Nucleo</include>
+                    
+          </Cincludes>
+              
+          <definestoremove>
+                    
+            <Adefines>            </Adefines>
+                    
+            <Cdefines>
+                                  
+              <define>USE_FULL_LL_DRIVER</define>
+                                  
+              <define>USE_FULL_ASSERT=1U</define>
+                          
+            </Cdefines>
+                     
+            <Ldefines>            </Ldefines>
+                     
+          </definestoremove>
+              
+          <inctoremove>
+                    
+            <Aincludes>
+                          
+              <include/>
+                          
+            </Aincludes>
+                    
+            <Cincludes>
+                          
+              <include>..\..\..\..\..\Drivers\BSP\STM32WLxx_Nucleo</include>
+                          
+            </Cincludes>
+                    
+          </inctoremove>
+                 
+        </config>
+                
+      </configs>
+       
+      <copyAsReference>true</copyAsReference>
+       
+      <Groups>
+        <group>
+               
+          <name>Doc</name>
+                  
+          <file>
+                        
+            <name>readme.txt</name>
+                    
+          </file>
+              
+        </group>
+        <group>
+               
+          <name>Drivers</name>
+          <group>
+                 
+            <name>BSP</name>
+            <group>
+                   
+              <name>STM32WLxx_Nucleo</name>
+                      
+              <file>
+                            
+                <name>../../../../../../Drivers/BSP/STM32WLxx_Nucleo/stm32wlxx_nucleo.c</name>
+                        
+              </file>
+                  
+            </group>
+                
+          </group>
+              
+        </group>
+            
+        <group>
+                  
+          <name>Drivers</name>
+                                       
+          <group>
+                        
+            <name>STM32WLxx_HAL_Driver</name>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_adc.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_adc_ex.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_ll_adc.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_rcc.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_rcc_ex.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_flash.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_flash_ex.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_gpio.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_dma.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_dma_ex.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_pwr.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_pwr_ex.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_cortex.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_exti.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_dac.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_dac_ex.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_tim.c</name>
+                              
+            </file>
+                        
+            <file>
+                              
+              <name>C:\Users\DLilov\STM32Cube\Repository\STM32Cube_FW_WL_V1.3.0\Drivers\STM32WLxx_HAL_Driver\Src\stm32wlxx_hal_tim_ex.c</name>
+                              
+            </file>
+                        
+          </group>
+                  
+          <group>
+                        
+            <name>CMSIS</name>
+                            
+            <file>
+                                          
+              <name>Src/system_stm32wlxx.c</name>
+                                          
+            </file>
+                                    
+          </group>
+                  
+        </group>
+               
+        <group>
+                  
+          <name>Application</name>
+                  
+          <group>
+                        
+            <name>User</name>
+                                  
+            <file>
+                                  
+              <name>Src\main.c</name>
+                                  
+            </file>
+                            
+            <file>
+                                  
+              <name>Src\stm32wlxx_it.c</name>
+                                  
+            </file>
+                            
+            <file>
+                                  
+              <name>Src\stm32wlxx_hal_msp.c</name>
+                                  
+            </file>
+                        
+          </group>
+                   
+        </group>
+                
+      </Groups>
+    </Project>
+  </Workspace>
+</ScratchFile>

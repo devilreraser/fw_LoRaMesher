@@ -979,11 +979,11 @@ void printDynamicMessageCounts() {
     sprintf(&print_line_idnt[strlen(print_line_idnt)], "|\r\n");
     sprintf(&print_line_mess[strlen(print_line_mess)], "|\r\n");
 
-    // printf("%s", print_line_dash);
-    // printf("%s", print_line_idnt);
-    // printf("%s", print_line_mess);
-    // printf("%s", print_line_dash);
-    printf("%s%s%s%s", print_line_dash, print_line_idnt, print_line_mess, print_line_dash);
+    printf("%s", print_line_dash);
+    printf("%s", print_line_idnt);
+    printf("%s", print_line_mess);
+    printf("%s", print_line_dash);
+    // printf("%s%s%s%s", print_line_dash, print_line_idnt, print_line_mess, print_line_dash);
 
 }
 /**
@@ -1522,11 +1522,21 @@ void MesherTask(void *pvParameters) {
 
 void setup() {
 
+    int res;
+
+    adc_dma_initialization();
+    // Create task for printf -> Serial handling
+    res = xTaskCreate(adc_dma_task,"adc_dma_task", 128, NULL, 1, NULL);
+    if (res != pdPASS) {
+        ESP_LOGE("main", "adc_dma_task creation gave error: %d", res);
+    }
+
+    delay(1000);
+    
 
     DebugHeapInit();
     initBuffer(&buffer_uart_printf);
     CircularQueue_Init(&circularQueue);
-    int res;
 
     Serial.begin(115200);
     while (!Serial);      // Wait for Serial to initialize
@@ -1577,7 +1587,6 @@ void setup() {
     }
     #endif
 
-    adc_dma_initialization();
 
     printf("initBoard \r\n");
     ESP_LOGI("main", "configMINIMAL_STACK_SIZE: %d", configMINIMAL_STACK_SIZE);

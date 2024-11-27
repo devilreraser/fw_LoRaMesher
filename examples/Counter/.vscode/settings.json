@@ -30,6 +30,18 @@
         "algorithm": "cpp",
         "stdint.h": "c",
         "task.h": "c",
-        "stop_token": "cpp"
+        "stop_token": "cpp",
+        "adc.h": "c",
+        "stm32wlxx_hal.h": "c",
+        "stm32wlxx_hal_conf.h": "c",
+        "stm32wlxx_ll_system.h": "c",
+        "stm32wlxx.h": "c",
+        "stm32wle5xx.h": "c",
+        "stm32wlxx_hal_dma.h": "c",
+        "stm32wlxx_hal_def.h": "c",
+        "stm32wlxx_ll_dma.h": "c",
+        "stm32wlxx_ll_dmamux.h": "c",
+        "stm32wl55xx.h": "c",
+        "stm32_hal_legacy.h": "c"
     }
 }

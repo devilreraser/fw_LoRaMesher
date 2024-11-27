@@ -32,12 +32,7 @@ extern "C" {
 
 
 
-
-
-
-//#include "stm32wlxx_nucleo.h"
-
-
+#include "stm32wlxx_nucleo_conf.h"
 
 
 
@@ -112,6 +107,9 @@ extern "C" {
 
 /* USER CODE END Private defines */
 void adc_dma_initialization(void);
+void adc_dma_task(void* arg);
+void adc_print_init_errors(void);
+void error_handler(int reason);
 
 #ifdef __cplusplus
 }

@@ -1,8 +1,13 @@
 
+#include "BuildOptions.h"
 #include "adc.h"
 
 
 /* Private variables ---------------------------------------------------------*/
+
+HAL_StatusTypeDef rcc_osc_status = 0;
+HAL_StatusTypeDef rcc_clk_status = 0;
+
 ADC_HandleTypeDef hadc;
 DMA_HandleTypeDef hdma_adc;
 
@@ -31,6 +36,8 @@ int error_reason_counter[ERROR_REASON_COUNT] = {0};
 int error_reason_unknown_counter = 0;
 int error_reason_unknown_last = 0;
 
+HAL_StatusTypeDef dma_hal_status = 0;
+
 void SystemClock_Config(void);
 static void MX_ADC_Init(void);
 static void MX_DAC_Init(void);
@@ -39,7 +46,7 @@ static void MX_DMA_Init(void);
 static void MX_GPIO_Init(void);
 static void Generate_waveform_SW_update_Config(void);
 static void Generate_waveform_SW_update(void);
-void Error_Handler(int reason);
+
 
 /* USER CODE END PV */
 
@@ -105,7 +112,7 @@ void adc_dma_initialization(void)
   if (HAL_ADCEx_Calibration_Start(&hadc) != HAL_OK)
   {
     /* Calibration Error */
-    Error_Handler(1);
+    error_handler(1);
   }
 
   /* Configure the DAC peripheral and generate a constant voltage of Vdda/2.  */
@@ -118,57 +125,69 @@ void adc_dma_initialization(void)
   if (HAL_TIM_Base_Start(&htim2) != HAL_OK)
   {
     /* Counter enable error */
-    Error_Handler(2);
+    error_handler(2);
   }
   
   /*## Start ADC conversions ###############################################*/
   /* Start ADC group regular conversion with DMA */
-  if (HAL_ADC_Start_DMA(&hadc,
-                        (uint32_t *)aADCxConvertedData,
-                        ADC_CONVERTED_DATA_BUFFER_SIZE
-                       ) != HAL_OK)
+  dma_hal_status = HAL_ADC_Start_DMA(&hadc, (uint32_t *)aADCxConvertedData, ADC_CONVERTED_DATA_BUFFER_SIZE);
+  if (dma_hal_status != HAL_OK)
   {
     /* ADC conversion start error */
-    Error_Handler(3);
+    error_handler(3);
   }  
+
+  adc_print_init_errors();
   
-//   while (1)
-//   {
-//     /* Modifies modifies the voltage level, to generate a waveform circular,  */
-//     /* shape of ramp: Voltage is increasing at each press on push button,     */
-//     /* from 0 to maximum range (Vdda) in 4 steps, then starting back from 0V. */
-//     /* Voltage is updated incrementally at each call of this function.        */
-//     Generate_waveform_SW_update();
-    
-//     /* Wait for event on push button to perform following actions */
-//     while ((ubUserButtonClickEvent) == RESET)
-//     {
-//     }
-//     /* Reset variable for next loop iteration (with debounce) */
-//     HAL_Delay(200);
-//     ubUserButtonClickEvent = RESET;
-    
-//     /* Note: Variable "ubUserButtonClickEvent" is set into push button        */
-//     /*       IRQ handler, refer to function "HAL_GPIO_EXTI_Callback()".       */
-
-//     /* USER CODE END WHILE */
-
-
-//     /* Note: LED state depending on DMA transfer status is set into DMA       */
-//     /*       IRQ handler, refer to functions "HAL_ADC_ConvCpltCallback()"     */
-//     /*       and "HAL_ADC_ConvHalfCpltCallback()".                            */
-
-//     /* Note: ADC conversions data are stored into array                       */
-//     /*       "aADCxConvertedData"                                             */
-//     /*       (for debug: see variable content into watch window).             */
-    
-//     /* Note: ADC conversion data are computed to physical values              */
-//     /*       into array "aADCxConvertedData_Voltage_mVolt"                    */
-//     /*       using helper macro "__ADC_CALC_DATA_VOLTAGE()".                  */
-//     /*       (for debug: see variable content into watch window).             */
-
-//   }
 }
+
+void adc_dma_task(void* arg)
+{
+    int print_counter = 0;
+    while (1)
+    {
+        /* Modifies modifies the voltage level, to generate a waveform circular,  */
+        /* shape of ramp: Voltage is increasing at each press on push button,     */
+        /* from 0 to maximum range (Vdda) in 4 steps, then starting back from 0V. */
+        /* Voltage is updated incrementally at each call of this function.        */
+        Generate_waveform_SW_update();
+
+        /* Wait for event on push button to perform following actions */
+        // while ((ubUserButtonClickEvent) == RESET)
+        // {
+        // }
+        /* Reset variable for next loop iteration (with debounce) */
+        vTaskDelay(10);
+        //ubUserButtonClickEvent = RESET;
+
+        /* Note: Variable "ubUserButtonClickEvent" is set into push button        */
+        /*       IRQ handler, refer to function "HAL_GPIO_EXTI_Callback()".       */
+
+        /* USER CODE END WHILE */
+
+
+        /* Note: LED state depending on DMA transfer status is set into DMA       */
+        /*       IRQ handler, refer to functions "HAL_ADC_ConvCpltCallback()"     */
+        /*       and "HAL_ADC_ConvHalfCpltCallback()".                            */
+
+        /* Note: ADC conversions data are stored into array                       */
+        /*       "aADCxConvertedData"                                             */
+        /*       (for debug: see variable content into watch window).             */
+
+        /* Note: ADC conversion data are computed to physical values              */
+        /*       into array "aADCxConvertedData_Voltage_mVolt"                    */
+        /*       using helper macro "__ADC_CALC_DATA_VOLTAGE()".                  */
+        /*       (for debug: see variable content into watch window).             */
+        print_counter++;
+        if (print_counter >= 500)
+        {
+            print_counter = 0;
+            adc_print_init_errors();
+        }
+    }
+
+}
+
 
 /**
   * @brief System Clock Configuration
@@ -196,26 +215,27 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  rcc_osc_status = HAL_RCC_OscConfig(&RCC_OscInitStruct);
+  if (rcc_osc_status != HAL_OK)
   {
-    Error_Handler(4);
+    error_handler(4);
   }
 
   /** Configure the SYSCLKSource, HCLK, PCLK1 and PCLK2 clocks dividers
   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK3|RCC_CLOCKTYPE_HCLK
-                              |RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1
-                              |RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV1;
-
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
-    Error_Handler(5);
-  }
+//   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK3|RCC_CLOCKTYPE_HCLK
+//                               |RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1
+//                               |RCC_CLOCKTYPE_PCLK2;
+//   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+//   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+//   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+//   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+//   RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV1;
+//   rcc_clk_status = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+//   if (rcc_clk_status != HAL_OK)
+//   {
+//     error_handler(5);
+//   }
 }
 
 /**
@@ -259,7 +279,7 @@ static void MX_ADC_Init(void)
   hadc.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
   if (HAL_ADC_Init(&hadc) != HAL_OK)
   {
-    Error_Handler(6);
+    error_handler(6);
   }
 
   /** Configure Regular Channel
@@ -269,7 +289,7 @@ static void MX_ADC_Init(void)
   sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
-    Error_Handler(7);
+    error_handler(7);
   }
   /* USER CODE BEGIN ADC_Init 2 */
 
@@ -300,7 +320,7 @@ static void MX_DAC_Init(void)
   hdac.Instance = DAC;
   if (HAL_DAC_Init(&hdac) != HAL_OK)
   {
-    Error_Handler(8);
+    error_handler(8);
   }
 
   /** DAC channel OUT1 config
@@ -312,7 +332,7 @@ static void MX_DAC_Init(void)
   sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
   if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
   {
-    Error_Handler(9);
+    error_handler(9);
   }
   /* USER CODE BEGIN DAC_Init 2 */
 
@@ -346,18 +366,18 @@ static void MX_TIM2_Init(void)
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
-    Error_Handler(10);
+    error_handler(10);
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
   if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
   {
-    Error_Handler(11);
+    error_handler(11);
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
-    Error_Handler(12);
+    error_handler(12);
   }
   /* USER CODE BEGIN TIM2_Init 2 */
 
@@ -418,14 +438,14 @@ static void Generate_waveform_SW_update_Config(void)
   if (HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, DIGITAL_SCALE_12BITS/2) != HAL_OK)
   {
     /* Setting value Error */
-    Error_Handler(13);
+    error_handler(13);
   }
   
   /* Enable DAC Channel: channel corresponding to ADC channel ADC_CHANNEL_6 */
   if (HAL_DAC_Start(&hdac, DAC_CHANNEL_1) != HAL_OK)
   {
     /* Start Error */
-    Error_Handler(14);
+    error_handler(14);
   }
 
 }
@@ -448,38 +468,39 @@ static void Generate_waveform_SW_update_Config(void)
   */
 static void Generate_waveform_SW_update(void)
 {
-  static uint8_t ub_dac_steps_count = 0;      /* Count number of clicks: Incremented after User Button interrupt */
-  
-  /* Set DAC voltage on channel corresponding to ADC_CHANNEL_6              */
-  /* in function of user button clicks count.                                   */
-  /* Set DAC output on 5 voltage levels, successively to:                       */
-  /*  - minimum of full range (0 <=> ground 0V)                                 */
-  /*  - 1/4 of full range (4095 <=> Vdda=3.3V): 1023 <=> 0.825V                 */
-  /*  - 1/2 of full range (4095 <=> Vdda=3.3V): 2048 <=> 1.65V                  */
-  /*  - 3/4 of full range (4095 <=> Vdda=3.3V): 3071 <=> 2.475V                 */
-  /*  - maximum of full range (4095 <=> Vdda=3.3V)                              */
-  if (HAL_DAC_SetValue(&hdac,
-                       DAC_CHANNEL_1,
-                       DAC_ALIGN_12B_R,
-                       ((DIGITAL_SCALE_12BITS * ub_dac_steps_count) / 4)
-                      ) != HAL_OK)
-  {
-    /* Start Error */
-    Error_Handler(15);
-  }
-  
-  /* Wait for voltage settling time */
-  HAL_Delay(1);
-  
-  /* Manage ub_dac_steps_count to increment it in 4 steps and circularly.   */
-  if (ub_dac_steps_count < 4)
-  {
-    ub_dac_steps_count++;
-  }
-  else
-  {
-    ub_dac_steps_count = 0;
-  }
+    static const uint8_t ub_dac_steps_total = 32;
+    static uint8_t ub_dac_steps_count = 0;      /* Count number of clicks: Incremented after User Button interrupt */
+    
+    /* Set DAC voltage on channel corresponding to ADC_CHANNEL_6              */
+    /* in function of user button clicks count.                                   */
+    /* Set DAC output on 5 voltage levels, successively to:                       */
+    /*  - minimum of full range (0 <=> ground 0V)                                 */
+    /*  - 1/4 of full range (4095 <=> Vdda=3.3V): 1023 <=> 0.825V                 */
+    /*  - 1/2 of full range (4095 <=> Vdda=3.3V): 2048 <=> 1.65V                  */
+    /*  - 3/4 of full range (4095 <=> Vdda=3.3V): 3071 <=> 2.475V                 */
+    /*  - maximum of full range (4095 <=> Vdda=3.3V)                              */
+    if (HAL_DAC_SetValue(&hdac,
+                        DAC_CHANNEL_1,
+                        DAC_ALIGN_12B_R,
+                        ((DIGITAL_SCALE_12BITS * ub_dac_steps_count) / ub_dac_steps_total)
+                        ) != HAL_OK)
+    {
+        /* Start Error */
+        error_handler(15);
+    }
+    
+    /* Wait for voltage settling time */
+    //HAL_Delay(1);
+    
+    /* Manage ub_dac_steps_count to increment it in ub_dac_steps_total steps and circularly.   */
+    if (ub_dac_steps_count < ub_dac_steps_total)
+    {
+        ub_dac_steps_count++;
+    }
+    else
+    {
+        ub_dac_steps_count = 0;
+    }
 
 }
 
@@ -559,7 +580,7 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
 void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
 {
   /* In case of ADC error, call main error handler */
-  Error_Handler(16);
+  error_handler(16);
 }
 
 /* USER CODE END 4 */
@@ -568,7 +589,7 @@ void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
-void Error_Handler(int reason)
+void error_handler(int reason)
 {
     if (reason < ERROR_REASON_COUNT)
     {
@@ -580,7 +601,7 @@ void Error_Handler(int reason)
         error_reason_unknown_last = reason;
     }
     
-  /* USER CODE BEGIN Error_Handler_Debug */
+  /* USER CODE BEGIN error_handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
 //   while(1) 
 //   {
@@ -594,6 +615,40 @@ void Error_Handler(int reason)
 //     // BSP_LED_On(LED2);
 //     HAL_Delay(10);
 //   }
-  /* USER CODE END Error_Handler_Debug */
+  /* USER CODE END error_handler_Debug */
 }
 
+
+void adc_print_init_errors(void)
+{
+    uint16_t id_spare = 0;
+    uint16_t messages_spare = 0;
+    char print_line_dash[256] = {0};
+    char print_line_idnt[256] = {0};
+    char print_line_mess[256] = {0};
+
+
+    for (int index = 0; index < ERROR_REASON_COUNT; index++)
+    {
+        sprintf(&print_line_dash[strlen(print_line_dash)], "---");
+        sprintf(&print_line_idnt[strlen(print_line_idnt)], "|%02d", index);
+        sprintf(&print_line_mess[strlen(print_line_mess)], "|%02d", error_reason_counter[index]);
+    }
+    sprintf(&print_line_dash[strlen(print_line_dash)], "---");
+    sprintf(&print_line_idnt[strlen(print_line_idnt)], "|%02d", error_reason_unknown_last);
+    sprintf(&print_line_mess[strlen(print_line_mess)], "|%02d", error_reason_unknown_counter);
+    
+    sprintf(&print_line_dash[strlen(print_line_dash)], "-\r\n");
+    sprintf(&print_line_idnt[strlen(print_line_idnt)], "|\r\n");
+    sprintf(&print_line_mess[strlen(print_line_mess)], "|\r\n");
+
+    printf("%s", print_line_dash);
+    printf("%s", print_line_idnt);
+    printf("%s", print_line_mess);
+    printf("%s", print_line_dash);
+
+    printf("dma_hal_status %d\r\n", dma_hal_status);
+
+
+
+}
