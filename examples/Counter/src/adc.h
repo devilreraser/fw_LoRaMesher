@@ -109,6 +109,8 @@ extern "C" {
 void adc_dma_initialization(void);
 void adc_dma_task(void* arg);
 void adc_print_init_errors(void);
+void adc_print_data(void);
+
 void error_handler(int reason);
 
 #ifdef __cplusplus

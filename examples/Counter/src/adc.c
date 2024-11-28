@@ -143,6 +143,7 @@ void adc_dma_initialization(void)
 
 void adc_dma_task(void* arg)
 {
+    int print_loops = 0;
     int print_counter = 0;
     while (1)
     {
@@ -179,10 +180,75 @@ void adc_dma_task(void* arg)
         /*       using helper macro "__ADC_CALC_DATA_VOLTAGE()".                  */
         /*       (for debug: see variable content into watch window).             */
         print_counter++;
-        if (print_counter >= 500)
+        if (print_counter % 500 == 250)
         {
-            print_counter = 0;
+
+
             adc_print_init_errors();
+
+        }
+        if (print_counter % 500 == 0)
+        {
+            print_loops++;
+
+            if (print_loops % 2 == 0)
+            {
+                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
+            }
+            else
+            {
+                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+            }
+
+            if (print_loops % 1 == 0)
+            {
+                // if (HAL_ADC_Stop_DMA(&hadc) != HAL_OK)
+                // {
+                //     error_handler(29);
+                // }
+                /** Configure Regular Channel
+                 */
+                ADC_ChannelConfTypeDef sConfig = {0};
+                sConfig.Channel = ADC_CHANNEL_6;
+                sConfig.Rank = ADC_REGULAR_RANK_1;
+                sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+                if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+                {
+                    error_handler(25);
+                }
+                // if (HAL_ADC_Start_DMA(&hadc, (uint32_t *)aADCxConvertedData, ADC_CONVERTED_DATA_BUFFER_SIZE) != HAL_OK) 
+                // {
+                //     error_handler(26);
+                // }
+
+
+            }
+            else
+            {
+                // if (HAL_ADC_Stop_DMA(&hadc) != HAL_OK)
+                // {
+                //     error_handler(30);
+                // }
+                /** Configure Regular Channel
+                 */
+                ADC_ChannelConfTypeDef sConfig = {0};
+                sConfig.Channel = ADC_CHANNEL_1;
+                sConfig.Rank = ADC_REGULAR_RANK_1;
+                sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+                if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+                {
+                    error_handler(27);
+                }
+                // if (HAL_ADC_Start_DMA(&hadc, (uint32_t *)aADCxConvertedData, ADC_CONVERTED_DATA_BUFFER_SIZE) != HAL_OK) 
+                // {
+                //     error_handler(28);
+                // }
+
+            }
+
+
+            adc_print_data();
+
         }
     }
 
@@ -250,7 +316,6 @@ static void MX_ADC_Init(void)
 
   /* USER CODE END ADC_Init 0 */
 
-  ADC_ChannelConfTypeDef sConfig = {0};
 
   /* USER CODE BEGIN ADC_Init 1 */
 
@@ -284,6 +349,7 @@ static void MX_ADC_Init(void)
 
   /** Configure Regular Channel
   */
+  ADC_ChannelConfTypeDef sConfig = {0};
   sConfig.Channel = ADC_CHANNEL_6;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
@@ -619,6 +685,35 @@ void error_handler(int reason)
 }
 
 
+void adc_print_data(void)
+{
+    uint16_t id_spare = 0;
+    uint16_t messages_spare = 0;
+    char print_line_dash[256] = {0};
+    char print_line_idnt[256] = {0};
+    char print_line_mess[256] = {0};
+
+
+    for (int index = 0; index < 16; index++)
+    {
+        sprintf(&print_line_dash[strlen(print_line_dash)], "------");
+        sprintf(&print_line_idnt[strlen(print_line_idnt)], "|%-05d", aADCxConvertedData[index]);
+        sprintf(&print_line_mess[strlen(print_line_mess)], "|%-05d", aADCxConvertedData_Voltage_mVolt[index]);
+    }
+
+    
+    sprintf(&print_line_dash[strlen(print_line_dash)], "-\r\n");
+    sprintf(&print_line_idnt[strlen(print_line_idnt)], "|\r\n");
+    sprintf(&print_line_mess[strlen(print_line_mess)], "|\r\n");
+
+    printf("%s", print_line_dash);
+    printf("%s", print_line_idnt);
+    printf("%s", print_line_mess);
+    printf("%s", print_line_dash);
+
+}
+
+
 void adc_print_init_errors(void)
 {
     uint16_t id_spare = 0;
@@ -648,7 +743,5 @@ void adc_print_init_errors(void)
     printf("%s", print_line_dash);
 
     printf("dma_hal_status %d\r\n", dma_hal_status);
-
-
 
 }
