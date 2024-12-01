@@ -38,6 +38,9 @@ int error_reason_unknown_last = 0;
 
 HAL_StatusTypeDef dma_hal_status = 0;
 
+int times_select_ch6 = 0;
+int times_select_ch1 = 0;
+
 void SystemClock_Config(void);
 static void MX_ADC_Init(void);
 static void MX_DAC_Init(void);
@@ -180,32 +183,32 @@ void adc_dma_task(void* arg)
         /*       using helper macro "__ADC_CALC_DATA_VOLTAGE()".                  */
         /*       (for debug: see variable content into watch window).             */
         print_counter++;
-        if (print_counter % 500 == 250)
+        if ((print_counter % 500) == 250)
         {
 
 
             adc_print_init_errors();
 
         }
-        if (print_counter % 500 == 0)
+        if ((print_counter % 500) == 0)
         {
             print_loops++;
 
-            if (print_loops % 2 == 0)
+            if ((print_loops & 2) == 0)
             {
-                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
+                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
             }
             else
             {
-                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
             }
 
-            if (print_loops % 1 == 0)
+            if ((print_loops & 1) == 0)
             {
-                // if (HAL_ADC_Stop_DMA(&hadc) != HAL_OK)
-                // {
-                //     error_handler(29);
-                // }
+                if (HAL_ADC_Stop_DMA(&hadc) != HAL_OK)
+                {
+                    error_handler(29);
+                }
                 /** Configure Regular Channel
                  */
                 ADC_ChannelConfTypeDef sConfig = {0};
@@ -216,19 +219,27 @@ void adc_dma_task(void* arg)
                 {
                     error_handler(25);
                 }
-                // if (HAL_ADC_Start_DMA(&hadc, (uint32_t *)aADCxConvertedData, ADC_CONVERTED_DATA_BUFFER_SIZE) != HAL_OK) 
-                // {
-                //     error_handler(26);
-                // }
+                sConfig.Channel = ADC_CHANNEL_1;
+                sConfig.Rank = ADC_REGULAR_RANK_2;
+                sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+                if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+                {
+                    error_handler(25);
+                }
+                if (HAL_ADC_Start_DMA(&hadc, (uint32_t *)aADCxConvertedData, ADC_CONVERTED_DATA_BUFFER_SIZE) != HAL_OK) 
+                {
+                    error_handler(26);
+                }
+                times_select_ch6++;
 
 
             }
             else
             {
-                // if (HAL_ADC_Stop_DMA(&hadc) != HAL_OK)
-                // {
-                //     error_handler(30);
-                // }
+                if (HAL_ADC_Stop_DMA(&hadc) != HAL_OK)
+                {
+                    error_handler(30);
+                }
                 /** Configure Regular Channel
                  */
                 ADC_ChannelConfTypeDef sConfig = {0};
@@ -239,10 +250,18 @@ void adc_dma_task(void* arg)
                 {
                     error_handler(27);
                 }
-                // if (HAL_ADC_Start_DMA(&hadc, (uint32_t *)aADCxConvertedData, ADC_CONVERTED_DATA_BUFFER_SIZE) != HAL_OK) 
-                // {
-                //     error_handler(28);
-                // }
+                sConfig.Channel = ADC_CHANNEL_6;
+                sConfig.Rank = ADC_REGULAR_RANK_2;
+                sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+                if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+                {
+                    error_handler(27);
+                }
+                if (HAL_ADC_Start_DMA(&hadc, (uint32_t *)aADCxConvertedData, ADC_CONVERTED_DATA_BUFFER_SIZE) != HAL_OK) 
+                {
+                    error_handler(28);
+                }
+                times_select_ch1++;
 
             }
 
@@ -332,7 +351,7 @@ static void MX_ADC_Init(void)
   hadc.Init.LowPowerAutoWait = DISABLE;
   hadc.Init.LowPowerAutoPowerOff = DISABLE;
   hadc.Init.ContinuousConvMode = DISABLE;
-  hadc.Init.NbrOfConversion = 1;
+  hadc.Init.NbrOfConversion = 2;
   hadc.Init.DiscontinuousConvMode = DISABLE;
   hadc.Init.ExternalTrigConv = ADC_EXTERNALTRIG_T2_TRGO;
   hadc.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
@@ -357,6 +376,14 @@ static void MX_ADC_Init(void)
   {
     error_handler(7);
   }
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+  {
+    error_handler(7);
+  }
+  times_select_ch6++;
   /* USER CODE BEGIN ADC_Init 2 */
 
   /* USER CODE END ADC_Init 2 */
@@ -742,6 +769,8 @@ void adc_print_init_errors(void)
     printf("%s", print_line_mess);
     printf("%s", print_line_dash);
 
-    printf("dma_hal_status %d\r\n", dma_hal_status);
+    printf("dma_hal_status    %d\r\n", dma_hal_status);
+    printf("times_select_ch6  %d\r\n", times_select_ch6);
+    printf("times_select_ch1  %d\r\n", times_select_ch1);
 
 }
